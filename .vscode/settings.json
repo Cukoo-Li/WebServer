@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "io_context": "cpp",
+        "limits": "cpp",
+        "memory": "cpp",
+        "functional": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp"
+    }
+}

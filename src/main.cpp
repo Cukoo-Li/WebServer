@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <cassert>
 
+#include "http/http_conn.h"
 #include "timer/sort_timer_list.h"
 
 const int kMaxFd = 65536;           // 最大文件描述符
@@ -20,9 +21,9 @@ const int kMaxEventNumber = 10000;  // 最大事件数
 // #define ASYNLOG     // 异步写日志
 
 // 在http_conn.cpp中定义
+extern int SetNonBlocking(int fd);
 extern int AddFd(int epollfd, int fd, bool one_shot);
 extern int RemoveFd(int epollfd, int fd);
-extern int SetNonBlocking(int fd);
 
 int pipefd[2];  // 统一事件源用到的管道
 int epollfd;    // epoll内核事件表
@@ -115,9 +116,11 @@ int main(int argc, char* argv[]) {
     epollfd = epoll_create(5);
     assert(epollfd != -1);
 
+    // 将创建好的epoll内核事件表共享给HttpConn类
+    HttpConn::epollfd_ = epollfd;
+
     // 往内核事件表中注册监听socket读事件
     AddFd(epollfd, listenfd, false);
-    // http_conn::m_epollfd = epollfd;
 
     // 统一事件源
     ret = socketpair(AF_UNIX, SOCK_STREAM, 0, pipefd);
