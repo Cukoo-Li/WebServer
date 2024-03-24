@@ -58,8 +58,9 @@ void TimerHandler() {
     alarm(kTimingCircle);
 }
 
-// 处理非活动连接（定时任务，用作定时器回调函数）
-// 删除非活动连接在socket上的注册事件，并关闭
+// 删除指定连接在socket上的注册事件，并关闭该连接
+// 用作定时器的回调函数
+// 每个连接都对应一个定时器，当定时器超时时，说明该连接长时间不活动，故处理之
 void HandleInactiveConn(ClientData* client_datas) {
     epoll_ctl(epollfd, EPOLL_CTL_DEL, client_datas->sockfd, 0);
     assert(client_datas);
@@ -187,16 +188,106 @@ int main(int argc, char* argv[]) {
                     sort_timer_list.AddTimer(timer);
                 }
             }
-            // 处理
+
+            // 处理文件描述符上的错误
             else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
-            }
-            // 处理信号
-            else if (sockfd == pipefd[0] && events[i].events & EPOLLIN) {
+                // 关闭连接，移除对应的定时器
+                Timer* timer = client_datas[sockfd].timer;
+                assert(timer);
+                timer->cb_func(&client_datas[sockfd]);
+                sort_timer_list.DeleteTimer(timer);
             }
 
-            // 处理客户连接上接收到的数据
-            else if (events[i].events & EPOLLIN) {
+            // 处理信号
+            else if (sockfd == pipefd[0] && events[i].events & EPOLLIN) {
+                int sig;
+                char signals[1024];
+                // ET模式不是应该这么写吗？可是作者不是这么写的
+                while (true) {
+                    ret = recv(pipefd[0], signals, sizeof(signals), 0);
+                    if (ret < 0) {
+                        // 连接已经接受完毕
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            printf("recv pipefd[0] later\n");
+                            break;
+                        }
+                        // 连接错误（是不是要退出程序、释放各种资源了？）
+                        printf("%s:errno is:%d", "accept error", errno);
+                        break;
+                    }
+                    for (int i = 0; i < ret; ++i) {
+                        switch (signals[i]) {
+                            case SIGALRM:
+                                timeout = true;
+                                break;
+                            case SIGTERM:
+                                stop_server = true;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+
             }
+
+            // 处理客户连接上的读就绪事件
+            else if (events[i].events & EPOLLIN) {
+                Timer* timer = client_datas[sockfd].timer;
+                // // 根据读的结果，决定是将任务添加到线程池，还是关闭连接
+                // if (users[sockfd].read_once()) {
+                //     LOG_INFO("deal with the client(%s)",
+                //              inet_ntoa(users[sockfd].get_address()->sin_addr));
+                //     Log::get_instance()->flush();
+                //     // 若监测到读就绪事件，将该事件放入请求队列
+                //     pool->append(users + sockfd);
+
+                //     // 该连接活动了，重置超时时间
+                //     // 并对新的定时器在链表上的位置进行调整
+                //     if (timer) {
+                //         time_t cur = time(nullptr);
+                //         timer->expire = cur + 3 * TIMESLOT;
+                //         LOG_INFO("%s", "adjust timer once");
+                //         Log::get_instance()->flush();
+                //         timer_lst.adjust_timer(timer);
+                //     }
+                // }
+                // // 关闭连接
+                // else {
+                //     timer->cb_func(&users_timer[sockfd]);
+                //     if (timer)
+                //     {
+                //         timer_lst.del_timer(timer);
+                //     }
+                // }
+            }
+
+            // 处理客户连接上的写就绪事件
+            else if (events[i].events & EPOLLOUT) {
+                Timer* timer = client_datas[sockfd].timer;
+                // // 根据写的结果，决定是否关闭连接
+                // if (users[sockfd].write()) {
+                //     LOG_INFO("send data to the client(%s)",
+                //              inet_ntoa(users[sockfd].get_address()->sin_addr));
+                //     Log::get_instance()->flush();
+
+                //     // 该连接活动了，重置超时时间
+                //     // 并对新的定时器在链表上的位置进行调整
+                //     if (timer) {
+                //         time_t cur = time(NULL);
+                //         timer->expire = cur + 3 * TIMESLOT;
+                //         LOG_INFO("%s", "adjust timer once");
+                //         Log::get_instance()->flush();
+                //         timer_lst.adjust_timer(timer);
+                //     }
+                // } else {
+                //     timer->cb_func(&users_timer[sockfd]);
+                //     if (timer) {
+                //         timer_lst.del_timer(timer);
+                //     }
+                // }
+            }
+
             // 最后处理定时事件（因为I/O事件有更高的优先级，当然，这样做会导致定时任务被延迟执行）
             if (timeout) {
                 TimerHandler();
