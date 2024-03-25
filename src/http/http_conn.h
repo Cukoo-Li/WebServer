@@ -24,6 +24,9 @@
 // #include "../lock/locker.h"
 // #include "../pool/sql_conn_pool.h"
 
+#define CR '\r'
+#define LF '\n'
+
 class HttpConn {
    public:
     static const int kFileNameLen = 200;
@@ -31,25 +34,29 @@ class HttpConn {
     static const int kWriteBufferSize = 1024;
     // HTTP请求方法
     enum METHOD { GET, POST, HEAD, PUT, DELETE, TRACE, OPTIONS, CONNECT, PATH };
-    // 解析客户请求时，主状态机所处的状态
+    // 解析HTTP请求时，主状态机所处的状态
     enum CHECK_STATE {
-        CHECK_STATE_REQUESTLINE,    // 分析请求行
-        CHECK_STATE_HEADER,         // 分析请求头
-        CHECK_STATE_CONTENT         // 分析请求体
+        CHECK_STATE_REQUESTLINE,  // 分析请求行
+        CHECK_STATE_HEADER,       // 分析请求头
+        CHECK_STATE_CONTENT       // 分析请求体
+    };
+    // 解析HTTP请求时，从状态机所处的状态
+    enum LINE_STATUS {
+        LINE_OK,   // 读取到一个完整的行
+        LINE_BAD,  // 行出错
+        LINE_MORE  // 行数据尚不完整
     };
     // 服务器处理HTTP请求的可能结果
     enum HTTP_CODE {
-        NO_REQUEST,
-        GET_REQUEST,
-        BAD_REQUEST,
+        NO_REQUEST,   // 请求不完整，需要继续读取客户数据
+        GET_REQUEST,  // 获得了一个完整的客户请求
+        BAD_REQUEST,  // 客户请求有语法错误
         NO_RESOURCE,
-        FORBIDDEN_REQUEST,
+        FORBIDDEN_REQUEST,  // 客户对资源没有访问权限
         FILE_REQUEST,
-        INTERNAL_ERROR,
-        CLOSED_CONNECTION
+        INTERNAL_ERROR,    // 服务器内部错误
+        CLOSED_CONNECTION  // 客户端已经关闭连接
     };
-    // 行的读取状态
-    enum LINE_STATUS { LINE_OK, LINE_BAD, LINE_OPEN };
 
    public:
     HttpConn() {}
@@ -79,12 +86,12 @@ class HttpConn {
     bool ProcessWrite(HTTP_CODE ret);
 
     // 下面这一组函数被ProcessRead调用以分析HTTP请求
-    HTTP_CODE ParseRequentLine(char* text);
+    char* GetLine() { return read_buf_ + start_line_; }
+    LINE_STATUS ParseLine();
+    HTTP_CODE ParseRequestLine(char* text);
     HTTP_CODE ParseHeaders(char* text);
     HTTP_CODE ParseContent(char* text);
     HTTP_CODE DoRequest();
-    char* GetLine() { return read_buf_ + start_line_; }
-    LINE_STATUS ParseLine();
 
     // 下面这一组函数被ProcessWrite调用以填充HTTP应答
     void Unmap();
@@ -115,7 +122,7 @@ class HttpConn {
     // 标识读缓冲区中已经读入的客户数据的最后一个字节的下一个位置
     int read_buf_end_;
     // 当前正在分析的字符在读缓冲区中的位置
-    int cheked_idx_;
+    int checked_idx_;
     // 当前正在解析的行的起始位置
     int start_line_;
     // 写缓冲区
@@ -148,7 +155,7 @@ class HttpConn {
     int iv_count_;
 
     int cgi;
-    char* request_header_;
+    char* request_content_;
     int bytes_to_send_;
     int bytes_have_send_;
 };
