@@ -46,15 +46,15 @@ class HttpConn {
         LINE_BAD,  // 行出错
         LINE_MORE  // 行数据尚不完整
     };
-    // 服务器处理HTTP请求的可能结果
+    // 处理HTTP请求的可能结果
     enum HTTP_CODE {
         NO_REQUEST,   // 请求不完整，需要继续读取客户数据
         GET_REQUEST,  // 获得了一个完整的客户请求
-        BAD_REQUEST,  // 客户请求有语法错误
-        NO_RESOURCE,
-        FORBIDDEN_REQUEST,  // 客户对资源没有访问权限
-        FILE_REQUEST,
-        INTERNAL_ERROR,    // 服务器内部错误
+        BAD_REQUEST = 404,  // 客户请求有语法错误
+        NO_RESOURCE,    // 请求资源不存在
+        FORBIDDEN_REQUEST= 403,  // 客户对请求资源没有访问权限
+        FILE_REQUEST = 200,       // 请求资源可以正常访问
+        INTERNAL_ERROR = 500,    // 服务器内部错误
         CLOSED_CONNECTION  // 客户端已经关闭连接
     };
 
@@ -95,9 +95,8 @@ class HttpConn {
 
     // 下面这一组函数被ProcessWrite调用以填充HTTP应答
     void Unmap();
-    bool AddResponse(const char* format, ...);
-    bool AddStatusLine(int status, const char* title);
-    bool AddHeaders(int content_length);
+    bool FillWriteBuffer(const char* format, ...);
+    bool AddStatusLine(int status, const char* phrase);
     bool AddContent(const char* content);
     bool AddContentType();
     bool AddContentLength(int content_length);
@@ -135,7 +134,7 @@ class HttpConn {
     METHOD method_;
 
     // 客户请求的目标文件的完整路径
-    char real_file_[kFileNameLen];
+    char file_path_[kFileNameLen];
     // 客户请求的目标文件名
     char* url_;
     // HTTP协议版本
