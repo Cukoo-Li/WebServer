@@ -62,7 +62,7 @@ void TimerHandler() {
 // 删除指定连接在socket上的注册事件，并关闭该连接
 // 用作定时器的回调函数
 // 每个连接都对应一个定时器，当定时器超时时，说明该连接长时间不活动，故处理之
-void HandleInactiveConn(ClientData* client_datas) {
+void CloseConn(ClientData* client_datas) {
     epoll_ctl(epollfd, EPOLL_CTL_DEL, client_datas->sockfd, 0);
     assert(client_datas);
     close(client_datas->sockfd);
@@ -79,6 +79,7 @@ void ShowError(int connfd, const char* info) {
 
 int main(int argc, char* argv[]) {
     // 初始化日志
+
     if (argc == 1)
         printf("usage: %s port_number\n", basename(argv[0]));
 
@@ -134,8 +135,8 @@ int main(int argc, char* argv[]) {
     bool stop_server = false;
     epoll_event events[kMaxEventNumber];
     ClientData* client_datas = new ClientData[kMaxFd];
-    // http_conn *users = new http_conn[kMaxFd];
-    // assert(users);
+    HttpConn* clients = new HttpConn[kMaxFd];
+    assert(clients);
     bool timeout = false;
     alarm(kTimingCircle);
 
@@ -185,7 +186,7 @@ int main(int argc, char* argv[]) {
                     client_datas[connfd].sockfd = connfd;
                     Timer* timer = new Timer();
                     timer->client_data = &client_datas[connfd];
-                    timer->cb_func = HandleInactiveConn;
+                    timer->cb_func = CloseConn;
                     timer->expire = time(nullptr) + 3 * kTimingCircle;
                     client_datas[connfd].timer = timer;
                     sort_timer_list.AddTimer(timer);
@@ -268,27 +269,26 @@ int main(int argc, char* argv[]) {
             // 处理客户连接上的写就绪事件
             else if (events[i].events & EPOLLOUT) {
                 Timer* timer = client_datas[sockfd].timer;
-                // // 根据写的结果，决定是否关闭连接
-                // if (users[sockfd].write()) {
-                //     LOG_INFO("send data to the client(%s)",
-                //              inet_ntoa(users[sockfd].get_address()->sin_addr));
-                //     Log::get_instance()->flush();
+                assert(timer);
+                // 根据写操作的返回值，决定是否保持连接
+                if (clients[sockfd].Write()) {
+                    // LOG_INFO("send data to the client(%s)",
+                    //          inet_ntoa(users[sockfd].get_address()->sin_addr));
+                    // Log::get_instance()->flush();
 
-                //     // 该连接活动了，重置超时时间
-                //     // 并对新的定时器在链表上的位置进行调整
-                //     if (timer) {
-                //         time_t cur = time(NULL);
-                //         timer->expire = cur + 3 * TIMESLOT;
-                //         LOG_INFO("%s", "adjust timer once");
-                //         Log::get_instance()->flush();
-                //         timer_lst.adjust_timer(timer);
-                //     }
-                // } else {
-                //     timer->cb_func(&users_timer[sockfd]);
-                //     if (timer) {
-                //         timer_lst.del_timer(timer);
-                //     }
-                // }
+                    // 该连接活动了，重置超时时间
+                    // 并对新的定时器在链表上的位置进行调整
+                    time_t cur = time(nullptr);
+                    timer->expire = cur + 3 * kTimingCircle;
+                    // LOG_INFO("%s", "adjust timer once");
+                    // Log::get_instance()->flush();
+                    sort_timer_list.AdjustTimer(timer);
+                }
+                // 关闭连接
+                else {
+                    CloseConn(&client_datas[sockfd]);
+                    sort_timer_list.DeleteTimer(timer);
+                }
             }
 
             // 最后处理定时事件（因为I/O事件有更高的优先级，当然，这样做会导致定时任务被延迟执行）

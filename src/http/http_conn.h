@@ -50,8 +50,8 @@ class HttpConn {
     enum HTTP_CODE {
         NO_REQUEST,   // 请求不完整，需要继续读取客户数据
         GET_REQUEST,  // 获得了一个完整的客户请求
-        BAD_REQUEST = 404,  // 客户请求有语法错误
-        NO_RESOURCE,    // 请求资源不存在
+        BAD_REQUEST = 404,  // 客户请求有语法错误或者请求资源不存在
+        // NO_RESOURCE,    // 请求资源不存在
         FORBIDDEN_REQUEST= 403,  // 客户对请求资源没有访问权限
         FILE_REQUEST = 200,       // 请求资源可以正常访问
         INTERNAL_ERROR = 500,    // 服务器内部错误

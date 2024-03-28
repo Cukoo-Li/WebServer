@@ -409,7 +409,8 @@ HttpConn::HTTP_CODE HttpConn::DoRequest() {
 
     // 检查文件状态
     if (stat(file_path_, &file_stat_) < 0)
-        return NO_RESOURCE;
+        // return NO_RESOURCE;
+        return BAD_REQUEST;
     if (!(file_stat_.st_mode & S_IROTH))
         return FORBIDDEN_REQUEST;
     if (S_ISDIR(file_stat_.st_mode))
@@ -432,7 +433,59 @@ void HttpConn::Unmap() {
 }
 
 // 写HTTP响应报文
-bool HttpConn::Write() {}
+bool HttpConn::Write() {
+    int byte_count = 0;
+
+    // 一般不会出现这种情况
+    if (bytes_to_send_ == 0) {
+        ResetOneShot(epollfd_, sockfd_, EPOLLIN);
+        Init();
+        return true;
+    }
+
+    // ET模式下，一直写，直至文件描述符的写缓冲区满
+    while (true) {
+        byte_count = writev(sockfd_, iv_, iv_count_);
+        if (byte_count == -1) {
+            // 无空位可写令
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                ResetOneShot(epollfd_, sockfd_, EPOLLOUT);
+                break;
+            }
+            // 发生错误
+            Unmap();
+            return false;
+        }
+
+        bytes_have_send_ += byte_count;
+        bytes_to_send_ -= byte_count;
+        // 这里作者是不是写错了
+        // if (bytes_have_send_ >= iv_[0].iov_len) {
+        if (bytes_have_send_ >= write_buf_end_) {
+            iv_[0].iov_len = 0;
+            if (iv_count_ == 2) {
+                iv_[1].iov_base += (bytes_have_send_ - write_buf_end_);
+                iv_[1].iov_len = bytes_to_send_;
+            }
+        } else {
+            iv_[0].iov_base += byte_count;
+            iv_[0].iov_len -= byte_count;
+        }
+
+        // 数据已经发送完毕
+        if (bytes_to_send_ <= 0) {
+            Unmap();
+            ResetOneShot(epollfd_, sockfd_, EPOLLIN);
+            if (linger_) {
+                Init();
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+    return true;
+}
 
 // 往写缓冲区中写入待发送的数据
 bool HttpConn::FillWriteBuffer(const char* format, ...) {
@@ -496,7 +549,7 @@ bool HttpConn::ProcessWrite(HTTP_CODE ret) {
                 iv_count_ = 2;
                 bytes_to_send_ = write_buf_end_ + file_stat_.st_size;
                 return true;
-            } 
+            }
             // 文件为空，没必要发送
             else {
                 const char* ok_string = "<html><body></body></html>";
