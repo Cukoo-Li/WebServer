@@ -109,7 +109,7 @@ class HttpConn {
     // 统计客户数量
     static int client_count_;
 
-    MYSQL* sql;
+    // MYSQL* sql;
 
    private:
     // 该http连接的socket和对方的socket地址

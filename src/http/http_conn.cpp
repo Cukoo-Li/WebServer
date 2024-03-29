@@ -69,7 +69,7 @@ int SetNonBlocking(int fd) {
 }
 
 // 往epoll内核事件表中注册fd上的读事件
-int AddFd(int epollfd, int fd, bool one_shot) {
+void AddFd(int epollfd, int fd, bool one_shot) {
     epoll_event event;
     event.data.fd = fd;
     event.events = EPOLLIN || EPOLLET || EPOLLRDHUP;
@@ -80,7 +80,7 @@ int AddFd(int epollfd, int fd, bool one_shot) {
 }
 
 // 删除文件描述符
-int RemoveFd(int epollfd, int fd) {
+void RemoveFd(int epollfd, int fd) {
     // 从内核事件表中删除有关fd的事件
     epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, nullptr);
     close(fd);
@@ -99,7 +99,7 @@ int HttpConn::epollfd_ = -1;
 
 // 初始化新接受的连接
 void HttpConn::Init(int sockfd, const sockaddr_in& address) {
-    sockfd_ = sockfd_;
+    sockfd_ = sockfd;
     address_ = address;
     AddFd(epollfd_, sockfd, true);
     ++client_count_;
@@ -117,7 +117,7 @@ void HttpConn::CloseConn(bool real_close) {
 
 // 初始化连接
 void HttpConn::Init() {
-    sql = nullptr;
+    // sql = nullptr;
     bytes_to_send_ = 0;
     bytes_have_send_ = 0;
     check_state_ = CHECK_STATE_REQUESTLINE;
@@ -147,9 +147,11 @@ bool HttpConn::Read() {
                           kReadBufferSize - read_buf_end_, 0);
         if (bytes_read == -1) {
             // 无数据可读了
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 break;
+            }
             // 发生错误
+            printf("errno: %d", errno);
             return false;
         }
         // 对方已关闭连接
@@ -167,13 +169,13 @@ HttpConn::LINE_STATUS HttpConn::ParseLine() {
     for (; checked_idx_ < read_buf_end_; ++checked_idx_) {
         cur = read_buf_[checked_idx_];
         // 当前字符是回车符，可能读取到一个完整的行
-        if (cur = CR) {
+        if (cur == '\r') {
             // 读到末尾，需要继续读客户数据
             if (checked_idx_ + 1 == read_buf_end_) {
                 return LINE_MORE;
             }
             // 下一个字符是换行符，成功读取一个完整的行
-            else if (read_buf_[checked_idx_ + 1] == LF) {
+            else if (read_buf_[checked_idx_ + 1] == '\n') {
                 read_buf_[checked_idx_++] = '\0';
                 read_buf_[checked_idx_++] = '\0';
                 return LINE_OK;
@@ -182,15 +184,16 @@ HttpConn::LINE_STATUS HttpConn::ParseLine() {
             return LINE_BAD;
         }
         // 当前字符是换行符，也可能读取到一个完整的行
-        else if (cur == LF) {
-            if (checked_idx_ > 1 && read_buf_[checked_idx_ - 1] == CR) {
-                read_buf_[checked_idx_ - 1] == '\0';
+        else if (cur == '\n') {
+            if (checked_idx_ > 1 && read_buf_[checked_idx_ - 1] == '\r') {
+                read_buf_[checked_idx_ - 1] = '\0';
                 read_buf_[checked_idx_++] = '\0';
                 return LINE_OK;
             }
             return LINE_BAD;
         }
     }
+    printf("LINE_MORE");
     return LINE_MORE;
 }
 
@@ -252,7 +255,7 @@ HttpConn::HTTP_CODE HttpConn::ParseHeaders(char* text) {
     if (text[0] == '\0') {
         // 检查是否含请求体，有的话继续读
         if (content_length_ != 0) {
-            check_state_ == CHECK_STATE_CONTENT;
+            check_state_ = CHECK_STATE_CONTENT;
             return NO_REQUEST;
         }
         return GET_REQUEST;
@@ -260,6 +263,7 @@ HttpConn::HTTP_CODE HttpConn::ParseHeaders(char* text) {
         text += 11;
         text += strspn(text, " \t");
         if (strcasecmp(text, "keep-alive") == 0) {
+            printf("keep-alive\n");
             linger_ = true;
         }
     } else if (strncasecmp(text, "Content-length:", 15) == 0) {
@@ -271,7 +275,6 @@ HttpConn::HTTP_CODE HttpConn::ParseHeaders(char* text) {
         text += strspn(text, " \t");
         host_ = text;
     } else {
-        printf("oop!unknow header: %s\n", text);
         // LOG_INFO("oop!unknow header: %s", text);
         // Log::get_instance()->flush();
     }
@@ -405,7 +408,7 @@ HttpConn::HTTP_CODE HttpConn::DoRequest() {
     if (resource_map.find(p[1]) != resource_map.end())
         strcpy(&file_path_[root_len], resource_map[p[1]]);
     else
-        strcpy(&file_path_[root_len], url_);  // 应该是p吧？
+        strcpy(&file_path_[root_len], url_);
 
     // 检查文件状态
     if (stat(file_path_, &file_stat_) < 0)
@@ -464,16 +467,18 @@ bool HttpConn::Write() {
         if (bytes_have_send_ >= write_buf_end_) {
             iv_[0].iov_len = 0;
             if (iv_count_ == 2) {
-                iv_[1].iov_base += (bytes_have_send_ - write_buf_end_);
+                iv_[1].iov_base =
+                    file_address_ + (bytes_have_send_ - write_buf_end_);
                 iv_[1].iov_len = bytes_to_send_;
             }
         } else {
-            iv_[0].iov_base += byte_count;
+            iv_[0].iov_base = write_buf_ + bytes_have_send_;
             iv_[0].iov_len -= byte_count;
         }
 
         // 数据已经发送完毕
         if (bytes_to_send_ <= 0) {
+            printf("数据已经发送完毕.\n");
             Unmap();
             ResetOneShot(epollfd_, sockfd_, EPOLLIN);
             if (linger_) {
@@ -536,6 +541,7 @@ bool HttpConn::AddContent(const char* content) {
 bool HttpConn::ProcessWrite(HTTP_CODE ret) {
     switch (ret) {
         case FILE_REQUEST:
+            printf("need file: %s\n", file_path_);
             AddStatusLine(ret, status_map[ret].first);
             // 文件非空，需要发送
             if (file_stat_.st_size != 0) {
@@ -570,6 +576,8 @@ bool HttpConn::ProcessWrite(HTTP_CODE ret) {
             AddBlankLine();
             if (!AddContent(status_map[ret].second))
                 return false;
+            printf("no need file\n");
+            break;
         default:
             return false;
     }

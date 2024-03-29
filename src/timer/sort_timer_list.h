@@ -32,7 +32,7 @@ class SortTimerList {
     void AddTimer(Timer* timer);
     void AdjustTimer(Timer* timer);
     void DeleteTimer(Timer* timer);
-    void tick();
+    void Tick();
 
    private:
     void AddTimer(Timer* timer, Timer* lst_head);

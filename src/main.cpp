@@ -12,12 +12,13 @@
 #include <cassert>
 
 #include "http/http_conn.h"
+#include "pool/thread_pool.h"
 #include "timer/sort_timer_list.h"
 
 const int kMaxFd = 65536;           // 最大文件描述符
 const int kMaxEventNumber = 10000;  // 最大事件数
 
-#define SYNLOG  // 同步写日志
+// #define SYNLOG  // 同步写日志
 // #define ASYNLOG     // 异步写日志
 
 // 在http_conn.cpp中定义
@@ -55,7 +56,7 @@ void AddSig(int sig, void SigHandler(int), bool restart = true) {
 
 // 处理SIGALRM信号（定时事件）
 void TimerHandler() {
-    sort_timer_list.tick();
+    sort_timer_list.Tick();
     alarm(kTimingCircle);
 }
 
@@ -66,7 +67,7 @@ void CloseConn(ClientData* client_datas) {
     epoll_ctl(epollfd, EPOLL_CTL_DEL, client_datas->sockfd, 0);
     assert(client_datas);
     close(client_datas->sockfd);
-    // http_conn::m_user_count--;
+    --HttpConn::client_count_;
     // LOG_INFO("close fd %d", user_data->sockfd);
     // Log::get_instance()->flush();
 }
@@ -77,19 +78,19 @@ void ShowError(int connfd, const char* info) {
     close(connfd);
 }
 
-int main(int argc, char* argv[]) {
+int main() {
     // 初始化日志
 
-    if (argc == 1)
-        printf("usage: %s port_number\n", basename(argv[0]));
-
-    int port = atoi(argv[1]);
+    int port = 1027;
 
     AddSig(SIGPIPE, SIG_IGN);  // 忽略SIGPIPE信号
 
     // 创建数据库连接池
+    // connection_pool* connPool = connection_pool::GetInstance();
+    // connPool->init("localhost", "root", "root", "qgydb", 3306, 8);
 
     // 创建线程池
+    ThreadPool<HttpConn>* pool = new ThreadPool<HttpConn>();
 
     // 初始化数据库读取表
 
@@ -154,10 +155,10 @@ int main(int argc, char* argv[]) {
 
             // 处理新到的客户连接
             if (sockfd == listenfd) {
-                sockaddr_in client_adress;
-                socklen_t client_adress_len = sizeof(client_adress);
+                sockaddr_in client_address;
+                socklen_t client_adress_len = sizeof(client_address);
                 while (true) {
-                    int connfd = accept(listenfd, (sockaddr*)&client_adress,
+                    int connfd = accept(listenfd, (sockaddr*)&client_address,
                                         &client_adress_len);
 
                     if (connfd < 0) {
@@ -170,19 +171,18 @@ int main(int argc, char* argv[]) {
                         printf("%s:errno is:%d", "accept error", errno);
                         break;
                     }
-                    // // 连接数超过上限
-                    // if (http_conn::m_user_count >= MAX_FD)
-                    // {
-                    //     show_error(connfd, "Internal server busy");
-                    //     LOG_ERROR("%s", "Internal server busy");
-                    //     break;
-                    // }
+                    // 连接数超过上限
+                    if (HttpConn::client_count_ >= kMaxFd) {
+                        // show_error(connfd, "Internal server busy");
+                        // LOG_ERROR("%s", "Internal server busy");
+                        break;
+                    }
 
-                    // // 保存客户连接
-                    // users[connfd].init(connfd, client_address);
+                    // 保存客户连接
+                    clients[connfd].Init(connfd, client_address);
 
                     // 初始化客户数据（主要是创建定时器）
-                    client_datas[connfd].address = client_adress;
+                    client_datas[connfd].address = client_address;
                     client_datas[connfd].sockfd = connfd;
                     Timer* timer = new Timer();
                     timer->client_data = &client_datas[connfd];
@@ -204,18 +204,17 @@ int main(int argc, char* argv[]) {
 
             // 处理信号
             else if (sockfd == pipefd[0] && events[i].events & EPOLLIN) {
-                int sig;
                 char signals[1024];
                 // ET模式不是应该这么写吗？可是作者不是这么写的
                 while (true) {
                     ret = recv(pipefd[0], signals, sizeof(signals), 0);
                     if (ret < 0) {
-                        // 连接已经接受完毕
+                        // 信号已经接收完毕
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
                             printf("recv pipefd[0] later\n");
                             break;
                         }
-                        // 连接错误（是不是要退出程序、释放各种资源了？）
+                        // 发生错误（是不是要退出程序、释放各种资源了？）
                         printf("%s:errno is:%d", "accept error", errno);
                         break;
                     }
@@ -238,32 +237,29 @@ int main(int argc, char* argv[]) {
             // 处理客户连接上的读就绪事件
             else if (events[i].events & EPOLLIN) {
                 Timer* timer = client_datas[sockfd].timer;
-                // // 根据读的结果，决定是将任务添加到线程池，还是关闭连接
-                // if (users[sockfd].read_once()) {
-                //     LOG_INFO("deal with the client(%s)",
-                //              inet_ntoa(users[sockfd].get_address()->sin_addr));
-                //     Log::get_instance()->flush();
-                //     // 若监测到读就绪事件，将该事件放入请求队列
-                //     pool->append(users + sockfd);
+                // 根据读的结果，决定是将任务添加到线程池，还是关闭连接
+                if (clients[sockfd].Read()) {
+                    // LOG_INFO("deal with the client(%s)",
+                    //          inet_ntoa(users[sockfd].get_address()->sin_addr));
+                    // Log::get_instance()->flush();
+                    // 若监测到读就绪事件，将该事件放入请求队列
+                    pool->append(&clients[sockfd]);
 
-                //     // 该连接活动了，重置超时时间
-                //     // 并对新的定时器在链表上的位置进行调整
-                //     if (timer) {
-                //         time_t cur = time(nullptr);
-                //         timer->expire = cur + 3 * TIMESLOT;
-                //         LOG_INFO("%s", "adjust timer once");
-                //         Log::get_instance()->flush();
-                //         timer_lst.adjust_timer(timer);
-                //     }
-                // }
-                // // 关闭连接
-                // else {
-                //     timer->cb_func(&users_timer[sockfd]);
-                //     if (timer)
-                //     {
-                //         timer_lst.del_timer(timer);
-                //     }
-                // }
+                    // 该连接活动了，重置超时时间
+                    // 并对新的定时器在链表上的位置进行调整
+                    if (timer) {
+                        time_t cur = time(nullptr);
+                        timer->expire = cur + 3 * kTimingCircle;
+                        // LOG_INFO("%s", "adjust timer once");
+                        // Log::get_instance()->flush();
+                        sort_timer_list.AdjustTimer(timer);
+                    }
+                }
+                // 关闭连接
+                else {
+                    CloseConn(&client_datas[sockfd]);
+                    sort_timer_list.DeleteTimer(timer);
+                }
             }
 
             // 处理客户连接上的写就绪事件
@@ -293,6 +289,7 @@ int main(int argc, char* argv[]) {
 
             // 最后处理定时事件（因为I/O事件有更高的优先级，当然，这样做会导致定时任务被延迟执行）
             if (timeout) {
+                printf("处理定时事件\n");
                 TimerHandler();
                 timeout = false;
             }
@@ -302,8 +299,8 @@ int main(int argc, char* argv[]) {
     close(listenfd);
     close(pipefd[1]);
     close(pipefd[0]);
-    // delete[] users;
+    delete[] clients;
     delete[] client_datas;
-    // delete pool;
+    delete pool;
     return 0;
 }

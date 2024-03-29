@@ -47,7 +47,7 @@ class Cond {
         pthread_mutex_destroy(&mutex_);
         pthread_cond_destroy(&cond_);
     }
-    bool Wait(pthread_mutex_t* mutex) {
+    bool Wait() {
         int ret = 0;
         pthread_mutex_lock(&mutex_);
         ret = pthread_cond_wait(&cond_, &mutex_);

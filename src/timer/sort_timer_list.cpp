@@ -83,7 +83,7 @@ void SortTimerList::DeleteTimer(Timer* timer) {
 }
 
 // 处理链表上到期的任务
-void SortTimerList::tick() {
+void SortTimerList::Tick() {
     if (!head_)
         return;
     // printf("timer tick\n");
@@ -95,6 +95,7 @@ void SortTimerList::tick() {
             break;
         }
         // 调用定时器的回调函数，以执行定时任务
+        printf("该连接超时，断开该连接\n");
         tmp->cb_func(tmp->client_data);
         // 删除定时器
         head_ = tmp->next;
