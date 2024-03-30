@@ -28,9 +28,11 @@ class ThreadPool {
     int max_task_number_;  // 任务队列中允许容纳的最大任务数量
     std::vector<pthread_t> threads_;  // 描述线程池的数组
     std::queue<T*> task_que_;         // 任务队列
-    Locker que_locker_;               // 保护任务队列的互斥锁
-    Sem que_stat_;  // 信号量，表示任务队列中任务数量
-    bool stop_;     // 是否结束线程
+    bool stop_;                       // 是否结束线程
+
+   private:
+    Locker que_locker_;  // 保护任务队列的互斥锁
+    Sem task_resource_;  // 信号量，表示任务队列中任务数量
     // connection_pool *m_connPool;  //数据库
 };
 
@@ -66,7 +68,7 @@ bool ThreadPool<T>::append(T* task) {
     }
     task_que_.push(task);
     que_locker_.Unlock();
-    que_stat_.Post();
+    task_resources_.Post();
     return true;
 }
 
@@ -80,7 +82,7 @@ void* ThreadPool<T>::worker(void* arg) {
 template <typename T>
 void ThreadPool<T>::run() {
     while (!stop_) {
-        que_stat_.Wait();
+        task_resources_.Wait();
         que_locker_.Lock();
         if (task_que_.empty()) {
             que_locker_.Unlock();

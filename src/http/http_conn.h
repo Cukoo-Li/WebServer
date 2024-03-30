@@ -21,11 +21,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-// #include "../lock/locker.h"
-// #include "../pool/sql_conn_pool.h"
-
-#define CR '\r'
-#define LF '\n'
+#include "../pool/db_conn_pool.h"
 
 class HttpConn {
    public:
@@ -75,7 +71,7 @@ class HttpConn {
     bool Write();
 
     sockaddr_in* address() { return &address_; }
-    // void InitSqlResult(SqlConnPool* sql_conn_pool);
+    void InitSqlResult(DbConnPool* sql_conn_pool);
 
    private:
     // 初始化连接

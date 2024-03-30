@@ -1,5 +1,5 @@
 #include "http_conn.h"
-// #include "../log/log.h"
+#include "../pool/db_conn_raii.h"
 #include <mysql/mysql.h>
 #include <fstream>
 #include <unordered_map>
@@ -26,39 +26,34 @@ std::unordered_map<char, const char*> resource_map = {{'0', "/register.html"},
                                                       {'6', "/video.html"},
                                                       {'7', "/fans.html"}};
 
-// //将表中的用户名和密码放入map
+// // 将表中的用户名和密码放入map
 // map<string, string> users;
 // locker m_lock;
 
-// void http_conn::initmysql_result(connection_pool *connPool)
-// {
-//     //先从连接池中取一个连接
-//     MYSQL *mysql = NULL;
-//     connectionRAII mysqlcon(&mysql, connPool);
+void InitSqlResult(DbConnPool* sql_conn_pool) {
+    // 先从连接池中取一个连接
+    MYSQL* mysql = nullptr;
+    DbConnRAII mysqlcon(&mysql, sql_conn_pool);
 
-//     //在user表中检索username，passwd数据，浏览器端输入
-//     if (mysql_query(mysql, "SELECT username,passwd FROM user"))
-//     {
-//         LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
-//     }
+    // 查询user表
+    if (mysql_query(mysql, "SELECT username,passwd FROM user")) {
+        printf("SELECT error:%s\n", mysql_error(mysql));
+    }
+    MYSQL_RES* result = mysql_store_result(mysql);
 
-//     //从表中检索完整的结果集
-//     MYSQL_RES *result = mysql_store_result(mysql);
+    // // 返回结果集中的列数
+    // int num_fields = mysql_num_fields(result);
 
-//     //返回结果集中的列数
-//     int num_fields = mysql_num_fields(result);
+    // // 返回所有字段结构的数组
+    // MYSQL_FIELD* fields = mysql_fetch_fields(result);
 
-//     //返回所有字段结构的数组
-//     MYSQL_FIELD *fields = mysql_fetch_fields(result);
-
-//     //从结果集中获取下一行，将对应的用户名和密码，存入map中
-//     while (MYSQL_ROW row = mysql_fetch_row(result))
-//     {
-//         string temp1(row[0]);
-//         string temp2(row[1]);
-//         users[temp1] = temp2;
-//     }
-// }
+    // // 从结果集中获取下一行，将对应的用户名和密码，存入map中
+    // while (MYSQL_ROW row = mysql_fetch_row(result)) {
+    //     string temp1(row[0]);
+    //     string temp2(row[1]);
+    //     users[temp1] = temp2;
+    // }
+}
 
 // 将fd设置为非阻塞的
 int SetNonBlocking(int fd) {

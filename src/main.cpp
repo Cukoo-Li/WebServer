@@ -14,6 +14,7 @@
 #include "http/http_conn.h"
 #include "pool/thread_pool.h"
 #include "timer/sort_timer_list.h"
+#include "pool/db_conn_pool.h"
 
 const int kMaxFd = 65536;           // 最大文件描述符
 const int kMaxEventNumber = 10000;  // 最大事件数
@@ -63,10 +64,10 @@ void TimerHandler() {
 // 删除指定连接在socket上的注册事件，并关闭该连接
 // 用作定时器的回调函数
 // 每个连接都对应一个定时器，当定时器超时时，说明该连接长时间不活动，故处理之
-void CloseConn(ClientData* client_datas) {
-    epoll_ctl(epollfd, EPOLL_CTL_DEL, client_datas->sockfd, 0);
-    assert(client_datas);
-    close(client_datas->sockfd);
+void CloseConn(ClientData* client_data) {
+    epoll_ctl(epollfd, EPOLL_CTL_DEL, client_data->sockfd, 0);
+    assert(client_data);
+    close(client_data->sockfd);
     --HttpConn::client_count_;
     // LOG_INFO("close fd %d", user_data->sockfd);
     // Log::get_instance()->flush();
@@ -86,8 +87,8 @@ int main() {
     AddSig(SIGPIPE, SIG_IGN);  // 忽略SIGPIPE信号
 
     // 创建数据库连接池
-    // connection_pool* connPool = connection_pool::GetInstance();
-    // connPool->init("localhost", "root", "root", "qgydb", 3306, 8);
+    DbConnPool* db_conn_pool = DbConnPool::Instance();
+    db_conn_pool->Init("localhost", "root", "root", "webserdb", 3306, 8);
 
     // 创建线程池
     ThreadPool<HttpConn>* pool = new ThreadPool<HttpConn>();
@@ -135,7 +136,7 @@ int main() {
     // 进入主循环前的准备工作
     bool stop_server = false;
     epoll_event events[kMaxEventNumber];
-    ClientData* client_datas = new ClientData[kMaxFd];
+    ClientData* client_data = new ClientData[kMaxFd];
     HttpConn* clients = new HttpConn[kMaxFd];
     assert(clients);
     bool timeout = false;
@@ -145,7 +146,6 @@ int main() {
     while (!stop_server) {
         int number = epoll_wait(epollfd, events, kMaxEventNumber, -1);
         if (number < 0 && errno != EINTR) {
-            // LOG_ERROR("%s", "epoll failure");
             printf("epoll failure");
             break;
         }
@@ -164,17 +164,16 @@ int main() {
                     if (connfd < 0) {
                         // 连接已经接受完毕
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            printf("accept later\n");
+                            printf("accept later.\n");
                             break;
                         }
                         // 连接错误（是不是要退出程序、释放各种资源了？）
-                        printf("%s:errno is:%d", "accept error", errno);
+                        printf("%s:errno is:%d\n", "accept error", errno);
                         break;
                     }
                     // 连接数超过上限
                     if (HttpConn::client_count_ >= kMaxFd) {
-                        // show_error(connfd, "Internal server busy");
-                        // LOG_ERROR("%s", "Internal server busy");
+                        printf("client_count_ >= kMaxFd\n");
                         break;
                     }
 
@@ -182,13 +181,13 @@ int main() {
                     clients[connfd].Init(connfd, client_address);
 
                     // 初始化客户数据（主要是创建定时器）
-                    client_datas[connfd].address = client_address;
-                    client_datas[connfd].sockfd = connfd;
+                    client_data[connfd].address = client_address;
+                    client_data[connfd].sockfd = connfd;
                     Timer* timer = new Timer();
-                    timer->client_data = &client_datas[connfd];
+                    timer->client_data = &client_data[connfd];
                     timer->cb_func = CloseConn;
                     timer->expire = time(nullptr) + 3 * kTimingCircle;
-                    client_datas[connfd].timer = timer;
+                    client_data[connfd].timer = timer;
                     sort_timer_list.AddTimer(timer);
                 }
             }
@@ -196,9 +195,9 @@ int main() {
             // 处理文件描述符上的错误
             else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
                 // 关闭连接，移除对应的定时器
-                Timer* timer = client_datas[sockfd].timer;
+                Timer* timer = client_data[sockfd].timer;
                 assert(timer);
-                timer->cb_func(&client_datas[sockfd]);
+                timer->cb_func(&client_data[sockfd]);
                 sort_timer_list.DeleteTimer(timer);
             }
 
@@ -236,7 +235,7 @@ int main() {
 
             // 处理客户连接上的读就绪事件
             else if (events[i].events & EPOLLIN) {
-                Timer* timer = client_datas[sockfd].timer;
+                Timer* timer = client_data[sockfd].timer;
                 // 根据读的结果，决定是将任务添加到线程池，还是关闭连接
                 if (clients[sockfd].Read()) {
                     // LOG_INFO("deal with the client(%s)",
@@ -257,14 +256,14 @@ int main() {
                 }
                 // 关闭连接
                 else {
-                    CloseConn(&client_datas[sockfd]);
+                    CloseConn(&client_data[sockfd]);
                     sort_timer_list.DeleteTimer(timer);
                 }
             }
 
             // 处理客户连接上的写就绪事件
             else if (events[i].events & EPOLLOUT) {
-                Timer* timer = client_datas[sockfd].timer;
+                Timer* timer = client_data[sockfd].timer;
                 assert(timer);
                 // 根据写操作的返回值，决定是否保持连接
                 if (clients[sockfd].Write()) {
@@ -282,7 +281,7 @@ int main() {
                 }
                 // 关闭连接
                 else {
-                    CloseConn(&client_datas[sockfd]);
+                    CloseConn(&client_data[sockfd]);
                     sort_timer_list.DeleteTimer(timer);
                 }
             }
@@ -300,7 +299,7 @@ int main() {
     close(pipefd[1]);
     close(pipefd[0]);
     delete[] clients;
-    delete[] client_datas;
+    delete[] client_data;
     delete pool;
     return 0;
 }
