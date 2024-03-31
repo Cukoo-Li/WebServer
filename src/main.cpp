@@ -88,7 +88,7 @@ int main() {
 
     // 创建数据库连接池
     DbConnPool* db_conn_pool = DbConnPool::Instance();
-    db_conn_pool->Init("localhost", "root", "root", "webserverdb", 3306, 8);
+    db_conn_pool->Init("localhost", "root", "123456", "webserverdb", 3306, 8);
 
     // 创建线程池
     ThreadPool<HttpConn>* pool = new ThreadPool<HttpConn>(db_conn_pool);
@@ -180,7 +180,6 @@ int main() {
 
                     // 保存客户连接
                     clients[connfd].Init(connfd, client_address);
-
                     // 初始化客户数据（主要是创建定时器）
                     client_data[connfd].address = client_address;
                     client_data[connfd].sockfd = connfd;

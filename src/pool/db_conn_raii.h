@@ -9,6 +9,7 @@ class DbConnRAII {
         assert(db_conn_pool);
         *db_conn = db_conn_pool->GetConnection();
         db_conn_ = *db_conn;
+        db_conn_pool_ = db_conn_pool;
     }
     ~DbConnRAII() { db_conn_pool_->ReturnConnection(db_conn_); }
 

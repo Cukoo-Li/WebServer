@@ -53,6 +53,7 @@ MYSQL* DbConnPool::GetConnection() {
     MYSQL* conn = conn_que_.front();
     conn_que_.pop();
     que_locker_.Unlock();
+    return conn;
 }
 
 // 归还连接

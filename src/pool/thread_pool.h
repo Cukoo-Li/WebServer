@@ -26,6 +26,9 @@ class ThreadPool {
     void run();
 
    private:
+    DbConnPool* db_conn_pool_;  // 数据库连接池
+
+   private:
     int thread_number_;    // 线程数量
     int max_task_number_;  // 任务队列中允许容纳的最大任务数量
     std::vector<pthread_t> threads_;  // 描述线程池的数组
@@ -33,9 +36,8 @@ class ThreadPool {
     bool stop_;                       // 是否结束线程
 
    private:
-    Locker que_locker_;         // 保护任务队列的互斥锁
-    Sem task_resource_;         // 信号量，表示任务队列中任务数量
-    DbConnPool* db_conn_pool_;  // 数据库
+    Locker que_locker_;  // 保护任务队列的互斥锁
+    Sem task_resource_;  // 信号量，表示任务队列中任务数量
 };
 
 template <typename T>
@@ -73,7 +75,7 @@ bool ThreadPool<T>::append(T* task) {
     }
     task_que_.push(task);
     que_locker_.Unlock();
-    task_resources_.Post();
+    task_resource_.Post();
     return true;
 }
 
@@ -87,7 +89,7 @@ void* ThreadPool<T>::worker(void* arg) {
 template <typename T>
 void ThreadPool<T>::run() {
     while (!stop_) {
-        task_resources_.Wait();
+        task_resource_.Wait();
         que_locker_.Lock();
         if (task_que_.empty()) {
             que_locker_.Unlock();

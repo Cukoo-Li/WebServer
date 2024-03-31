@@ -1,7 +1,10 @@
 #include "http_conn.h"
+
 #include <mysql/mysql.h>
 #include <fstream>
+#include <iostream>
 #include <unordered_map>
+#include "../itc/itc.h"
 #include "../pool/db_conn_raii.h"
 
 // 定义http响应的一些状态信息
@@ -26,7 +29,6 @@ std::unordered_map<char, const char*> resource_map = {{'0', "/register.html"},
                                                       {'6', "/video.html"},
                                                       {'7', "/fans.html"}};
 
-
 // 将表中的用户名和密码放入map
 std::unordered_map<std::string, std::string> account_map;
 Locker account_map_locker;
@@ -38,7 +40,7 @@ void HttpConn::LoadAccounts(DbConnPool* sql_conn_pool) {
     DbConnRAII mysql_conn(&mysql, sql_conn_pool);
 
     // 查询user表
-    if (mysql_query(mysql, "SELECT username,passwd FROM user")) {
+    if (mysql_query(mysql, "SELECT user,passwd FROM account")) {
         printf("SELECT error:%s\n", mysql_error(mysql));
     }
     MYSQL_RES* result = mysql_store_result(mysql);
@@ -105,7 +107,7 @@ void HttpConn::CloseConn(bool real_close) {
 
 // 初始化连接
 void HttpConn::Init() {
-    // sql = nullptr;
+    db_conn_ = nullptr;
     bytes_to_send_ = 0;
     bytes_have_send_ = 0;
     check_state_ = CHECK_STATE_REQUESTLINE;
@@ -332,36 +334,36 @@ HttpConn::HTTP_CODE HttpConn::DoRequest() {
     int root_len = strlen(root);
     char flag = strrchr(url_, '/')[1];
 
+    // 处理cgi
     // 实现登录和注册校验
     if (cgi == 1 && (flag == '2' || flag == '3')) {
-        strcat(file_address_, "/");
-        strcat(file_address_, &url_[2]);
+        strcat(file_path_, "/");
+        strcat(file_path_, &url_[2]);
 
         // 将用户名和密码提取出来
-        // user=123&passwd=123
+        // user=123&password=123
         char* delimiter = strchr(request_content_, '&');
         std::string user(&request_content_[5],
                          delimiter - &request_content_[5]);
-        std::string passwd(delimiter + 1);
+        std::string passwd(delimiter + 10);
 
         // 注册
         if (flag == '3') {
             // 没有重名
             if (account_map.find(user) == account_map.end()) {
-                std::string sql_insert;
-                sql_insert += "INSERT INTO user(username, passwd) VALUES('";
-                sql_insert += user;
-                sql_insert += "', '";
-                sql_insert += passwd;
-                sql_insert += "'";
+                std::string sql_insert =
+                    "INSERT INTO account(user, passwd) VALUES('" + user +
+                    "', '" + passwd + "')";
                 account_map_locker.Lock();
                 int ret = mysql_query(db_conn_, sql_insert.c_str());
                 account_map.insert({user, passwd});
                 account_map_locker.Unlock();
                 if (ret == 0)
                     strcpy(url_, "/log.html");
-                else
+                else {
+                    std::cout << "ret = " << ret << std::endl;
                     strcpy(url_, "/registerError.html");
+                }
             }
             // 重名
             else
@@ -378,28 +380,28 @@ HttpConn::HTTP_CODE HttpConn::DoRequest() {
             else
                 strcpy(url_, "/logError.html");
         }
-
-        if (resource_map.find(flag) != resource_map.end())
-            strcpy(&file_path_[root_len], resource_map[flag]);
-        else
-            strcpy(&file_path_[root_len], url_);
-
-        // 检查文件状态
-        if (stat(file_path_, &file_stat_) < 0)
-            // return NO_RESOURCE;
-            return BAD_REQUEST;
-        if (!(file_stat_.st_mode & S_IROTH))
-            return FORBIDDEN_REQUEST;
-        if (S_ISDIR(file_stat_.st_mode))
-            return BAD_REQUEST;
-
-        // 将文件映射到内存中
-        int fd = open(file_path_, O_RDONLY);
-        file_address_ = static_cast<char*>(
-            mmap(0, file_stat_.st_size, PROT_READ, MAP_PRIVATE, fd, 0));
-        close(fd);
-        return FILE_REQUEST;
     }
+
+    if (resource_map.find(flag) != resource_map.end())
+        strcpy(&file_path_[root_len], resource_map[flag]);
+    else
+        strcpy(&file_path_[root_len], url_);
+
+    // 检查文件状态
+    if (stat(file_path_, &file_stat_) < 0)
+        // return NO_RESOURCE;
+        return BAD_REQUEST;
+    if (!(file_stat_.st_mode & S_IROTH))
+        return FORBIDDEN_REQUEST;
+    if (S_ISDIR(file_stat_.st_mode))
+        return BAD_REQUEST;
+
+    // 将文件映射到内存中
+    int fd = open(file_path_, O_RDONLY);
+    file_address_ = static_cast<char*>(
+        mmap(0, file_stat_.st_size, PROT_READ, MAP_PRIVATE, fd, 0));
+    close(fd);
+    return FILE_REQUEST;
 }
 
 // 对内存映射区执行mupmap操作
@@ -451,9 +453,9 @@ bool HttpConn::Write() {
             iv_[0].iov_len -= byte_count;
         }
 
-        // 数据已经发送完毕
+        // 数据发送完毕
         if (bytes_to_send_ <= 0) {
-            printf("数据已经发送完毕.\n");
+            printf("数据发送完毕.\n");
             Unmap();
             ResetOneShot(epollfd_, sockfd_, EPOLLIN);
             if (linger_) {
