@@ -7,12 +7,14 @@
 #include <stdexcept>
 #include <vector>
 #include "../itc/itc.h"
-// #include "../CGImysql/sql_connection_pool.h"
+#include "../pool/db_conn_pool.h"
+#include "../pool/db_conn_raii.h"
 
 template <typename T>
 class ThreadPool {
    public:
-    ThreadPool(/*connection_pool *connPool, */ int thread_number = 8,
+    ThreadPool(DbConnPool* db_conn_pool,
+               int thread_number = 8,
                int max_task_number = 10000);
     ~ThreadPool();
     // 往任务队列中添加任务
@@ -31,14 +33,17 @@ class ThreadPool {
     bool stop_;                       // 是否结束线程
 
    private:
-    Locker que_locker_;  // 保护任务队列的互斥锁
-    Sem task_resource_;  // 信号量，表示任务队列中任务数量
-    // connection_pool *m_connPool;  //数据库
+    Locker que_locker_;         // 保护任务队列的互斥锁
+    Sem task_resource_;         // 信号量，表示任务队列中任务数量
+    DbConnPool* db_conn_pool_;  // 数据库
 };
 
 template <typename T>
-ThreadPool<T>::ThreadPool(int thread_number, int max_task_number)
-    : thread_number_(thread_number),
+ThreadPool<T>::ThreadPool(DbConnPool* db_conn_pool,
+                          int thread_number,
+                          int max_task_number)
+    : db_conn_pool_(db_conn_pool),
+      thread_number_(thread_number),
       max_task_number_(max_task_number),
       stop_(false) {
     if (thread_number <= 0 || max_task_number <= 0)
@@ -92,6 +97,7 @@ void ThreadPool<T>::run() {
         task_que_.pop();
         que_locker_.Unlock();
         assert(task);
+        DbConnRAII mysql_conn(&task->db_conn_, db_conn_pool_);
         task->Process();
     }
 }

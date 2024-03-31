@@ -11,7 +11,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <cstring>
 #include <sys/epoll.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
@@ -71,7 +71,7 @@ class HttpConn {
     bool Write();
 
     sockaddr_in* address() { return &address_; }
-    void InitSqlResult(DbConnPool* sql_conn_pool);
+    static void LoadAccounts(DbConnPool* sql_conn_pool);
 
    private:
     // 初始化连接
@@ -104,8 +104,8 @@ class HttpConn {
     static int epollfd_;
     // 统计客户数量
     static int client_count_;
-
-    // MYSQL* sql;
+    // 数据库连接
+    MYSQL *db_conn_;
 
    private:
     // 该http连接的socket和对方的socket地址
@@ -149,10 +149,10 @@ class HttpConn {
     struct iovec iv_[2];
     int iv_count_;
 
-    int cgi;
-    char* request_content_;
-    int bytes_to_send_;
-    int bytes_have_send_;
+    int cgi;                    // 是否需要执行cgi
+    char* request_content_;     // 请求体
+    int bytes_to_send_;         // 需要发送的字节数
+    int bytes_have_send_;       // 已经发送的字节数
 };
 
 #endif

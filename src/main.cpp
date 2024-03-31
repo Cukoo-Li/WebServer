@@ -88,12 +88,13 @@ int main() {
 
     // 创建数据库连接池
     DbConnPool* db_conn_pool = DbConnPool::Instance();
-    db_conn_pool->Init("localhost", "root", "root", "webserdb", 3306, 8);
+    db_conn_pool->Init("localhost", "root", "root", "webserverdb", 3306, 8);
 
     // 创建线程池
-    ThreadPool<HttpConn>* pool = new ThreadPool<HttpConn>();
+    ThreadPool<HttpConn>* pool = new ThreadPool<HttpConn>(db_conn_pool);
 
-    // 初始化数据库读取表
+    // 初始化account_map
+    HttpConn::LoadAccounts(db_conn_pool);
 
     // 创建socket
     int listenfd = socket(AF_INET, SOCK_STREAM, 0);

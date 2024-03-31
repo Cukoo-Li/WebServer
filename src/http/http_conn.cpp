@@ -1,8 +1,8 @@
 #include "http_conn.h"
-#include "../pool/db_conn_raii.h"
 #include <mysql/mysql.h>
 #include <fstream>
 #include <unordered_map>
+#include "../pool/db_conn_raii.h"
 
 // 定义http响应的一些状态信息
 std::unordered_map<int, std::pair<const char*, const char*>> status_map = {
@@ -26,14 +26,16 @@ std::unordered_map<char, const char*> resource_map = {{'0', "/register.html"},
                                                       {'6', "/video.html"},
                                                       {'7', "/fans.html"}};
 
-// // 将表中的用户名和密码放入map
-// map<string, string> users;
-// locker m_lock;
 
-void InitSqlResult(DbConnPool* sql_conn_pool) {
+// 将表中的用户名和密码放入map
+std::unordered_map<std::string, std::string> account_map;
+Locker account_map_locker;
+
+// 这个应该设置成静态函数
+void HttpConn::LoadAccounts(DbConnPool* sql_conn_pool) {
     // 先从连接池中取一个连接
     MYSQL* mysql = nullptr;
-    DbConnRAII mysqlcon(&mysql, sql_conn_pool);
+    DbConnRAII mysql_conn(&mysql, sql_conn_pool);
 
     // 查询user表
     if (mysql_query(mysql, "SELECT username,passwd FROM user")) {
@@ -41,18 +43,9 @@ void InitSqlResult(DbConnPool* sql_conn_pool) {
     }
     MYSQL_RES* result = mysql_store_result(mysql);
 
-    // // 返回结果集中的列数
-    // int num_fields = mysql_num_fields(result);
-
-    // // 返回所有字段结构的数组
-    // MYSQL_FIELD* fields = mysql_fetch_fields(result);
-
-    // // 从结果集中获取下一行，将对应的用户名和密码，存入map中
-    // while (MYSQL_ROW row = mysql_fetch_row(result)) {
-    //     string temp1(row[0]);
-    //     string temp2(row[1]);
-    //     users[temp1] = temp2;
-    // }
+    // 存入共享的哈希表中
+    while (MYSQL_ROW row = mysql_fetch_row(result))
+        account_map[std::string(row[0])] = std::string(row[1]);
 }
 
 // 将fd设置为非阻塞的
@@ -337,89 +330,76 @@ HttpConn::HTTP_CODE HttpConn::ProcessRead() {
 HttpConn::HTTP_CODE HttpConn::DoRequest() {
     strcpy(file_path_, root);
     int root_len = strlen(root);
-    const char* p = strrchr(url_, '/');
+    char flag = strrchr(url_, '/')[1];
 
-    // // 实现登录和注册校验
-    // if (cgi == 1 && (p[1] == '2' || p[1] == '3')) {
-    //     char flag = url_[1];
-    //     // 根据标志判断是登录检测还是注册检测
+    // 实现登录和注册校验
+    if (cgi == 1 && (flag == '2' || flag == '3')) {
+        strcat(file_address_, "/");
+        strcat(file_address_, &url_[2]);
 
-    //     char flag = m_url[1];
+        // 将用户名和密码提取出来
+        // user=123&passwd=123
+        char* delimiter = strchr(request_content_, '&');
+        std::string user(&request_content_[5],
+                         delimiter - &request_content_[5]);
+        std::string passwd(delimiter + 1);
 
-    //     char* m_url_real = (char*)malloc(sizeof(char) * 200);
-    //     strcpy(m_url_real, "/");
-    //     strcat(m_url_real, m_url + 2);
-    //     strncpy(m_real_file + len, m_url_real, FILENAME_LEN - len - 1);
-    //     free(m_url_real);
+        // 注册
+        if (flag == '3') {
+            // 没有重名
+            if (account_map.find(user) == account_map.end()) {
+                std::string sql_insert;
+                sql_insert += "INSERT INTO user(username, passwd) VALUES('";
+                sql_insert += user;
+                sql_insert += "', '";
+                sql_insert += passwd;
+                sql_insert += "'";
+                account_map_locker.Lock();
+                int ret = mysql_query(db_conn_, sql_insert.c_str());
+                account_map.insert({user, passwd});
+                account_map_locker.Unlock();
+                if (ret == 0)
+                    strcpy(url_, "/log.html");
+                else
+                    strcpy(url_, "/registerError.html");
+            }
+            // 重名
+            else
+                strcpy(url_, "/registerError.html");
+        }
 
-    //     // 将用户名和密码提取出来
-    //     // user=123&passwd=123
-    //     char name[100], password[100];
-    //     int i;
-    //     for (i = 5; m_string[i] != '&'; ++i)
-    //         name[i - 5] = m_string[i];
-    //     name[i - 5] = '\0';
+        // 登录
+        if (flag == '2') {
+            // 用户名存在且密码正确
+            if (account_map.find(user) != account_map.end() &&
+                account_map[user] == passwd)
+                strcpy(url_, "/welcome.html");
+            // 用户名不存在或密码错误
+            else
+                strcpy(url_, "/logError.html");
+        }
 
-    //     int j = 0;
-    //     for (i = i + 10; m_string[i] != '\0'; ++i, ++j)
-    //         password[j] = m_string[i];
-    //     password[j] = '\0';
+        if (resource_map.find(flag) != resource_map.end())
+            strcpy(&file_path_[root_len], resource_map[flag]);
+        else
+            strcpy(&file_path_[root_len], url_);
 
-    //     // 同步线程登录校验
-    //     if (*(p + 1) == '3') {
-    //         // 如果是注册，先检测数据库中是否有重名的
-    //         // 没有重名的，进行增加数据
-    //         char* sql_insert = (char*)malloc(sizeof(char) * 200);
-    //         strcpy(sql_insert, "INSERT INTO user(username, passwd) VALUES(");
-    //         strcat(sql_insert, "'");
-    //         strcat(sql_insert, name);
-    //         strcat(sql_insert, "', '");
-    //         strcat(sql_insert, password);
-    //         strcat(sql_insert, "')");
+        // 检查文件状态
+        if (stat(file_path_, &file_stat_) < 0)
+            // return NO_RESOURCE;
+            return BAD_REQUEST;
+        if (!(file_stat_.st_mode & S_IROTH))
+            return FORBIDDEN_REQUEST;
+        if (S_ISDIR(file_stat_.st_mode))
+            return BAD_REQUEST;
 
-    //         if (users.find(name) == users.end()) {
-    //             m_lock.lock();
-    //             int res = mysql_query(mysql, sql_insert);
-    //             users.insert(pair<string, string>(name, password));
-    //             m_lock.unlock();
-
-    //             if (!res)
-    //                 strcpy(m_url, "/log.html");
-    //             else
-    //                 strcpy(m_url, "/registerError.html");
-    //         } else
-    //             strcpy(m_url, "/registerError.html");
-    //     }
-    //     // 如果是登录，直接判断
-    //     // 若浏览器端输入的用户名和密码在表中可以查找到，返回1，否则返回0
-    //     else if (*(p + 1) == '2') {
-    //         if (users.find(name) != users.end() && users[name] == password)
-    //             strcpy(m_url, "/welcome.html");
-    //         else
-    //             strcpy(m_url, "/logError.html");
-    //     }
-    // }
-
-    if (resource_map.find(p[1]) != resource_map.end())
-        strcpy(&file_path_[root_len], resource_map[p[1]]);
-    else
-        strcpy(&file_path_[root_len], url_);
-
-    // 检查文件状态
-    if (stat(file_path_, &file_stat_) < 0)
-        // return NO_RESOURCE;
-        return BAD_REQUEST;
-    if (!(file_stat_.st_mode & S_IROTH))
-        return FORBIDDEN_REQUEST;
-    if (S_ISDIR(file_stat_.st_mode))
-        return BAD_REQUEST;
-
-    // 将文件映射到内存中
-    int fd = open(file_path_, O_RDONLY);
-    file_address_ = static_cast<char*>(
-        mmap(0, file_stat_.st_size, PROT_READ, MAP_PRIVATE, fd, 0));
-    close(fd);
-    return FILE_REQUEST;
+        // 将文件映射到内存中
+        int fd = open(file_path_, O_RDONLY);
+        file_address_ = static_cast<char*>(
+            mmap(0, file_stat_.st_size, PROT_READ, MAP_PRIVATE, fd, 0));
+        close(fd);
+        return FILE_REQUEST;
+    }
 }
 
 // 对内存映射区执行mupmap操作
