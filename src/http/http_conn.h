@@ -94,7 +94,6 @@ class HttpConn {
     bool FillWriteBuffer(const char* format, ...);
     bool AddStatusLine(int status, const char* phrase);
     bool AddContent(const char* content);
-    bool AddContentType();
     bool AddContentLength(int content_length);
     bool AddLinger();
     bool AddBlankLine();

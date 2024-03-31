@@ -497,10 +497,6 @@ bool HttpConn::AddContentLength(int content_length) {
     return FillWriteBuffer("Content-Length:%d\r\n", content_length);
 }
 
-bool HttpConn::AddContentType() {
-    return FillWriteBuffer("Content-Type:%s\r\n", "text/html");
-}
-
 bool HttpConn::AddLinger() {
     return FillWriteBuffer("Connection:%s\r\n",
                            linger_ == true ? "keep-alive" : "close");
