@@ -1,1 +1,0 @@
-/usr/bin/c++  -Wall -g -rdynamic CMakeFiles/webserver.dir/main.cpp.o CMakeFiles/webserver.dir/http/http_conn.cpp.o CMakeFiles/webserver.dir/timer/sort_timer_list.cpp.o CMakeFiles/webserver.dir/pool/db_conn_pool.cpp.o -o webserver  -lpthread -lmysqlclient
