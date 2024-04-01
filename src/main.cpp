@@ -267,16 +267,10 @@ int main() {
                 assert(timer);
                 // 根据写操作的返回值，决定是否保持连接
                 if (clients[sockfd].Write()) {
-                    // LOG_INFO("send data to the client(%s)",
-                    //          inet_ntoa(users[sockfd].get_address()->sin_addr));
-                    // Log::get_instance()->flush();
-
                     // 该连接活动了，重置超时时间
                     // 并对新的定时器在链表上的位置进行调整
                     time_t cur = time(nullptr);
                     timer->expire = cur + 3 * kTimingCircle;
-                    // LOG_INFO("%s", "adjust timer once");
-                    // Log::get_instance()->flush();
                     sort_timer_list.AdjustTimer(timer);
                 }
                 // 关闭连接

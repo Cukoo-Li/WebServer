@@ -47,11 +47,9 @@ class HttpConn {
         NO_REQUEST,   // 请求不完整，需要继续读取客户数据
         GET_REQUEST,  // 获得了一个完整的客户请求
         BAD_REQUEST = 404,  // 客户请求有语法错误或者请求资源不存在
-        // NO_RESOURCE,    // 请求资源不存在
         FORBIDDEN_REQUEST= 403,  // 客户对请求资源没有访问权限
         FILE_REQUEST = 200,       // 请求资源可以正常访问
         INTERNAL_ERROR = 500,    // 服务器内部错误
-        CLOSED_CONNECTION  // 客户端已经关闭连接
     };
 
    public:
@@ -63,11 +61,11 @@ class HttpConn {
     void Init(int sockfd, const sockaddr_in& addr);
     // 关闭连接
     void CloseConn(bool real_close = true);
-    // 处理客户请求
+    // 处理客户请求（由工作线程调用）
     void Process();
-    // 非阻塞读操作
+    // 非阻塞读操作（由主线程调用）
     bool Read();
-    // 非阻塞写操作
+    // 非阻塞写操作（由主线程调用）
     bool Write();
 
     sockaddr_in* address() { return &address_; }
