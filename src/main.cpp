@@ -12,9 +12,9 @@
 #include <cassert>
 
 #include "http/http_conn.h"
-#include "pool/thread_pool.h"
-#include "timer/sort_timer_list.h"
 #include "pool/db_conn_pool.h"
+#include "pool/thread_pool.h"
+#include "timer/timer_pile.h"
 
 const int kMaxFd = 65536;           // 最大文件描述符
 const int kMaxEventNumber = 10000;  // 最大事件数
@@ -31,8 +31,8 @@ int pipefd[2];  // 统一事件源用到的管道
 int epollfd;    // epoll内核事件表
 
 // 基于升序链表的定时器
-SortTimerList sort_timer_list;
-const int kTimingCircle = 5;  // 定时周期
+TimerPile timer_pile;
+const int kTimingCircle = 1;  // 定时周期
 
 // 信号处理函数（统一事件源）
 void SigHandler(int sig) {
@@ -56,21 +56,21 @@ void AddSig(int sig, void SigHandler(int), bool restart = true) {
 }
 
 // 处理SIGALRM信号（定时事件）
-void TimerHandler() {
-    sort_timer_list.Tick();
-    alarm(kTimingCircle);
+void TimeoutOperation() {
+    printf("timeout.\n");
+    timer_pile.HandleTimer();
+    if (!timer_pile.Empty())
+        alarm(timer_pile.Countdown());
 }
 
 // 删除指定连接在socket上的注册事件，并关闭该连接
 // 用作定时器的回调函数
 // 每个连接都对应一个定时器，当定时器超时时，说明该连接长时间不活动，故处理之
-void CloseConn(ClientData* client_data) {
-    epoll_ctl(epollfd, EPOLL_CTL_DEL, client_data->sockfd, 0);
-    assert(client_data);
-    close(client_data->sockfd);
+void CloseConn(HttpConn* http_conn) {
+    epoll_ctl(epollfd, EPOLL_CTL_DEL, http_conn->sockfd(), 0);
+    assert(http_conn);
+    close(http_conn->sockfd());
     --HttpConn::client_count_;
-    // LOG_INFO("close fd %d", user_data->sockfd);
-    // Log::get_instance()->flush();
 }
 
 void ShowError(int connfd, const char* info) {
@@ -137,11 +137,9 @@ int main() {
     // 进入主循环前的准备工作
     bool stop_server = false;
     epoll_event events[kMaxEventNumber];
-    ClientData* client_data = new ClientData[kMaxFd];
     HttpConn* clients = new HttpConn[kMaxFd];
     assert(clients);
     bool timeout = false;
-    alarm(kTimingCircle);
 
     // 进入主循环
     while (!stop_server) {
@@ -180,25 +178,24 @@ int main() {
 
                     // 保存客户连接
                     clients[connfd].Init(connfd, client_address);
-                    // 初始化客户数据（主要是创建定时器）
-                    client_data[connfd].address = client_address;
-                    client_data[connfd].sockfd = connfd;
-                    Timer* timer = new Timer();
-                    timer->client_data = &client_data[connfd];
-                    timer->cb_func = CloseConn;
-                    timer->expire = time(nullptr) + 3 * kTimingCircle;
-                    client_data[connfd].timer = timer;
-                    sort_timer_list.AddTimer(timer);
+                    // 创建定时器
+                    time_t deadline = time(nullptr) + 3 * kTimingCircle;
+                    Timer* timer =
+                        new Timer(&clients[connfd], CloseConn, deadline);
+                    clients[connfd].set_timer(timer);
+                    if (timer_pile.Empty())
+                        alarm(3 * kTimingCircle);
+                    timer_pile.AddTimer(timer);
                 }
             }
 
             // 处理文件描述符上的错误
             else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
                 // 关闭连接，移除对应的定时器
-                Timer* timer = client_data[sockfd].timer;
+                Timer* timer = clients[sockfd].timer();
                 assert(timer);
-                timer->cb_func(&client_data[sockfd]);
-                sort_timer_list.DeleteTimer(timer);
+                timer->Execute();
+                timer->Delete();
             }
 
             // 处理信号
@@ -235,55 +232,44 @@ int main() {
 
             // 处理客户连接上的读就绪事件
             else if (events[i].events & EPOLLIN) {
-                Timer* timer = client_data[sockfd].timer;
+                Timer* timer = clients[sockfd].timer();
+                assert(timer);
                 // 根据读的结果，决定是将任务添加到线程池，还是关闭连接
                 if (clients[sockfd].Read()) {
-                    // LOG_INFO("deal with the client(%s)",
-                    //          inet_ntoa(users[sockfd].get_address()->sin_addr));
-                    // Log::get_instance()->flush();
                     // 若监测到读就绪事件，将该事件放入请求队列
                     pool->append(&clients[sockfd]);
-
                     // 该连接活动了，重置超时时间
-                    // 并对新的定时器在链表上的位置进行调整
-                    if (timer) {
-                        time_t cur = time(nullptr);
-                        timer->expire = cur + 3 * kTimingCircle;
-                        // LOG_INFO("%s", "adjust timer once");
-                        // Log::get_instance()->flush();
-                        sort_timer_list.AdjustTimer(timer);
-                    }
+                    time_t cur = time(nullptr);
+                    timer->set_deadline(cur + 3 * kTimingCircle);
                 }
                 // 关闭连接
                 else {
-                    CloseConn(&client_data[sockfd]);
-                    sort_timer_list.DeleteTimer(timer);
+                    timer->Execute();
+                    timer->Delete();
                 }
             }
 
             // 处理客户连接上的写就绪事件
             else if (events[i].events & EPOLLOUT) {
-                Timer* timer = client_data[sockfd].timer;
+                Timer* timer = clients[sockfd].timer();
                 assert(timer);
                 // 根据写操作的返回值，决定是否保持连接
                 if (clients[sockfd].Write()) {
                     // 该连接活动了，重置超时时间
-                    // 并对新的定时器在链表上的位置进行调整
                     time_t cur = time(nullptr);
-                    timer->expire = cur + 3 * kTimingCircle;
-                    sort_timer_list.AdjustTimer(timer);
+                    timer->set_deadline(cur + 3 * kTimingCircle);
                 }
                 // 关闭连接
                 else {
-                    CloseConn(&client_data[sockfd]);
-                    sort_timer_list.DeleteTimer(timer);
+                    timer->Execute();
+                    timer->Delete();
                 }
             }
 
             // 最后处理定时事件（因为I/O事件有更高的优先级，当然，这样做会导致定时任务被延迟执行）
             if (timeout) {
                 printf("处理定时事件\n");
-                TimerHandler();
+                TimeoutOperation();
                 timeout = false;
             }
         }
@@ -293,7 +279,6 @@ int main() {
     close(pipefd[1]);
     close(pipefd[0]);
     delete[] clients;
-    delete[] client_data;
     delete pool;
     return 0;
 }

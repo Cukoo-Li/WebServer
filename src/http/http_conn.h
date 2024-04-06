@@ -11,7 +11,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <cstring>
 #include <sys/epoll.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
@@ -20,8 +19,10 @@
 #include <sys/uio.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <cstring>
 
 #include "../pool/db_conn_pool.h"
+#include "../timer/timer_pile.h"
 
 class HttpConn {
    public:
@@ -44,17 +45,22 @@ class HttpConn {
     };
     // 处理HTTP请求的可能结果
     enum HTTP_CODE {
-        NO_REQUEST,   // 请求不完整，需要继续读取客户数据
-        GET_REQUEST,  // 获得了一个完整的客户请求
+        NO_REQUEST,         // 请求不完整，需要继续读取客户数据
+        GET_REQUEST,        // 获得了一个完整的客户请求
         BAD_REQUEST = 404,  // 客户请求有语法错误或者请求资源不存在
-        FORBIDDEN_REQUEST= 403,  // 客户对请求资源没有访问权限
+        FORBIDDEN_REQUEST = 403,  // 客户对请求资源没有访问权限
         FILE_REQUEST = 200,       // 请求资源可以正常访问
-        INTERNAL_ERROR = 500,    // 服务器内部错误
+        INTERNAL_ERROR = 500,     // 服务器内部错误
     };
 
    public:
     HttpConn() {}
     ~HttpConn() {}
+
+   public:
+    void set_timer(Timer* timer) { timer_ = timer; }
+    Timer* timer() { return timer_; }
+    int sockfd() { return sockfd_; }
 
    public:
     // 初始化新接受的连接
@@ -102,12 +108,13 @@ class HttpConn {
     // 统计客户数量
     static int client_count_;
     // 数据库连接
-    MYSQL *db_conn_;
+    MYSQL* db_conn_;
 
    private:
     // 该http连接的socket和对方的socket地址
     int sockfd_;
     sockaddr_in address_;
+    Timer* timer_;
 
     // 读缓冲区
     char read_buf_[kReadBufferSize];
@@ -146,10 +153,10 @@ class HttpConn {
     struct iovec iv_[2];
     int iv_count_;
 
-    int cgi;                    // 是否需要执行cgi
-    char* request_content_;     // 请求体
-    int bytes_to_send_;         // 需要发送的字节数
-    int bytes_have_send_;       // 已经发送的字节数
+    int cgi;                 // 是否需要执行cgi
+    char* request_content_;  // 请求体
+    int bytes_to_send_;      // 需要发送的字节数
+    int bytes_have_send_;    // 已经发送的字节数
 };
 
 #endif
