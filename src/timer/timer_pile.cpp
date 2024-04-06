@@ -1,7 +1,7 @@
 #include "timer_pile.h"
 
-#include <unistd.h>
 #include <stdio.h>
+#include <unistd.h>
 
 Timer::Timer(HttpConn* http_conn, void (*cb_func)(HttpConn*), time_t deadline)
     : http_conn_(http_conn),
@@ -28,18 +28,19 @@ void TimerPile::AddTimer(Timer* timer) {
 void TimerPile::HandleTimer() {
     while (!timer_que_.empty()) {
         Timer* timer = timer_que_.top();
-        timer_que_.pop();
         // 无效定时器
         if (timer->IsDeleted()) {
             printf("无效定时器.\n");
+            timer_que_.pop();
             delete timer;
-        } 
+        }
         // 过期定时器
         else if (timer->IsExpired()) {
             printf("处理过期定时器.\n");
+            timer_que_.pop();
             timer->Execute();
             delete timer;
-        } 
+        }
         // 未过期定时器
         else {
             printf("未过期定时器\n");
