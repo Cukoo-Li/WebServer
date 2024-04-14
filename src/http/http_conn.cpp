@@ -296,8 +296,6 @@ HttpConn::HTTP_CODE HttpConn::ProcessRead() {
            ((line_status = ParseLine()) == LINE_OK)) {
         text = GetLine();
         start_line_ = checked_idx_;
-        // LOG_INFO("%s", text);
-        // Log::get_instance()->flush();
         switch (check_state_) {
             // 解析请求行
             case CHECK_STATE_REQUESTLINE:
@@ -484,8 +482,6 @@ bool HttpConn::FillWriteBuffer(const char* format, ...) {
     }
     write_buf_end_ += bytes_write;
     va_end(args);
-    // LOG_INFO("request:%s", m_write_buf);
-    // Log::get_instance()->flush();
     return true;
 }
 

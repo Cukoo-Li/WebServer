@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <cassert>
+#include <iostream>
 
 #include "http/http_conn.h"
 #include "pool/db_conn_pool.h"
@@ -18,9 +19,6 @@
 
 const int kMaxFd = 65536;           // 最大文件描述符
 const int kMaxEventNumber = 10000;  // 最大事件数
-
-// #define SYNLOG  // 同步写日志
-// #define ASYNLOG     // 异步写日志
 
 // 在http_conn.cpp中定义
 extern int SetNonBlocking(int fd);
@@ -32,11 +30,11 @@ int epollfd;    // epoll内核事件表
 
 // 基于升序链表的定时器
 TimerPile timer_pile;
-const int kTimingCircle = 1;  // 定时周期
+const int kTimingCircle = 2;  // 定时周期
 
 // 信号处理函数（统一事件源）
 void SigHandler(int sig) {
-    // 保留原来的errno,在函数最后恢复，以保证函数的可重入性
+    // 保留原来的errno，在函数最后恢复，以保证函数的可重入性
     int save_errno = errno;
     int msg = sig;
     send(pipefd[1], (char*)&msg, 1, 0);  // 将信号值通过管道发送给主循环
@@ -238,9 +236,15 @@ int main() {
                 if (clients[sockfd].Read()) {
                     // 若监测到读就绪事件，将该事件放入请求队列
                     pool->append(&clients[sockfd]);
-                    // 该连接活动了，重置超时时间
-                    time_t cur = time(nullptr);
-                    timer->set_deadline(cur + 3 * kTimingCircle);
+                    // 该连接活动了，重置超时时间（标记删除旧定时器，插入新定时器）
+                    timer->Delete();
+                    time_t deadline = time(nullptr) + 3 * kTimingCircle;
+                    Timer* new_timer =
+                        new Timer(&clients[sockfd], CloseConn, deadline);
+                    clients[sockfd].set_timer(new_timer);
+                    if (timer_pile.Empty())
+                        alarm(3 * kTimingCircle);
+                    timer_pile.AddTimer(new_timer);
                 }
                 // 关闭连接
                 else {
@@ -255,9 +259,15 @@ int main() {
                 assert(timer);
                 // 根据写操作的返回值，决定是否保持连接
                 if (clients[sockfd].Write()) {
-                    // 该连接活动了，重置超时时间
-                    time_t cur = time(nullptr);
-                    timer->set_deadline(cur + 3 * kTimingCircle);
+                    // 该连接活动了，重置超时时间（标记删除旧定时器，插入新定时器）
+                    timer->Delete();
+                    time_t deadline = time(nullptr) + 3 * kTimingCircle;
+                    Timer* new_timer =
+                        new Timer(&clients[sockfd], CloseConn, deadline);
+                    clients[sockfd].set_timer(new_timer);
+                    if (timer_pile.Empty())
+                        alarm(3 * kTimingCircle);
+                    timer_pile.AddTimer(new_timer);
                 }
                 // 关闭连接
                 else {
@@ -268,7 +278,6 @@ int main() {
 
             // 最后处理定时事件（因为I/O事件有更高的优先级，当然，这样做会导致定时任务被延迟执行）
             if (timeout) {
-                printf("处理定时事件\n");
                 TimeoutOperation();
                 timeout = false;
             }

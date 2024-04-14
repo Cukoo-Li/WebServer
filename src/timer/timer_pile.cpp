@@ -34,14 +34,14 @@ void TimerPile::HandleTimer() {
             timer_que_.pop();
             delete timer;
         }
-        // 过期定时器
+        // 过期的有效定时器
         else if (timer->IsExpired()) {
             printf("处理过期定时器.\n");
             timer_que_.pop();
             timer->Execute();
             delete timer;
         }
-        // 未过期定时器
+        // 未过期的有效定时器
         else {
             printf("未过期定时器\n");
             break;
