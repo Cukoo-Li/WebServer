@@ -18,10 +18,10 @@ class ThreadPool {
                 while (true) {
                     if (pool->is_stopped)
                         break;
-                    if (!pool->tasks.empty()) {
+                    if (!pool->tasks_que_.empty()) {
                         auto task =
-                            std::move(pool->tasks.front());  // 有必要 move 吗？
-                        pool->tasks.pop();
+                            std::move(pool->tasks_que_.front());  // 有必要 move 吗？
+                        pool->tasks_que_.pop();
                         locker.unlock();
                         task();
                         locker.lock();
@@ -50,7 +50,7 @@ class ThreadPool {
     template<typename F>
     void AddTask(F&& task) {
         std::unique_lock<std::mutex> locker(pool_->mtx);
-        pool_->tasks.emplace(std::forward<F>(task));
+        pool_->tasks_que_.emplace(std::forward<F>(task));
         locker.unlock();
         pool_->cv.notify_one();
     }
@@ -60,7 +60,7 @@ class ThreadPool {
         std::mutex mtx;
         std::condition_variable cv;
         bool is_stopped;
-        std::queue<std::function<void()>> tasks;
+        std::queue<std::function<void()>> tasks_que_;
     };
     std::shared_ptr<Pool> pool_;
 };

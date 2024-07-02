@@ -1,6 +1,8 @@
 {
     "C_Cpp.default.compilerPath": "/usr/bin/g++",
     "files.associations": {
-        "vector": "cpp"
+        "vector": "cpp",
+        "condition_variable": "cpp",
+        "chrono": "cpp"
     }
 }

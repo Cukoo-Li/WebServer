@@ -5,11 +5,28 @@
 #include <string>
 #include <queue>
 #include <mutex>
-#include <semaphore.h>
+#include <condition_variable>
 #include <thread>
 #include "../log/log.h"
 
 class SqlConnPool {
+    public:
+    static SqlConnPool* Instance();
+
+    MYSQL* GetConn();
+    void FreeConn(MYSQL* conn);
+
+    void Init(const char* host, int port, const char* user, const char* pwd, const char* db_name, int conn_num = 8);
+
+    private:
+    SqlConnPool() = default;
+    ~SqlConnPool();
+
+    int conn_num_{};
+
+    std::queue<MYSQL*> conns_que_;
+    std::mutex mtx_;
+    std::condition_variable cv_;
 
 };
 

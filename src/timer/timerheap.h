@@ -38,7 +38,7 @@ class TimerHeap {
     int GetNextTick();  // ???
 
    private:
-    void Remove(size_t t);              // ???
+    void Remove(size_t i);              // ???
     void SiftUp(size_t i);              // ???
     bool SiftDown(size_t i, size_t n);  // ???
     void SwapNode(size_t i, size_t j);  // ???
