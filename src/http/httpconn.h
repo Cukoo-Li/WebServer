@@ -28,7 +28,7 @@ class HttpConn {
 
     void Close();
 
-    int fd() const;
+    int sockfd() const;
 
     int port() const;
 
@@ -42,12 +42,12 @@ class HttpConn {
 
     bool IsKeepAlive() const { return request_.IsKeepAlive(); }
 
-    static bool is_Et_;
+    static bool is_et_;
     static const char* kSrcDir_;
-    static std::atomic<int> user_count_;
+    static std::atomic<int> client_count_;
 
    private:
-    int fd_;
+    int sockfd_;
     sockaddr_in addr_;
     bool is_closed_;
     int iov_cnt_;

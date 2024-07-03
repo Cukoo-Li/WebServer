@@ -1,0 +1,125 @@
+#include "httpconn.h"
+
+bool HttpConn::is_et_ = true;
+const char* HttpConn::kSrcDir_ = nullptr;
+std::atomic<int> HttpConn::client_count_{};
+
+HttpConn::HttpConn() {
+    sockfd_ = -1;
+    addr_ = {};
+    is_closed_ = true;
+}
+
+HttpConn::~HttpConn() {
+    Close();
+}
+
+void HttpConn::Init(int sockfd, const sockaddr_in& addr) {
+    assert(sockfd > 0);
+    ++client_count_;
+    addr_ = addr;
+    sockfd_ = sockfd;
+    write_buff_.RetrieveAll();
+    read_buff_.RetrieveAll();
+    is_closed_ = false;
+    // LOG_INFO("Client[%d](%s:%d) in, userCount:%d", fd_, GetIP(), GetPort(),
+    // (int)userCount);
+}
+
+void HttpConn::Close() {
+    response_.UnmapFile();
+    if (is_closed_) {
+        return;
+    }
+    is_closed_ = true;
+    --client_count_;
+    close(sockfd_);
+    // LOG_INFO("Client[%d](%s:%d) quit, UserCount:%d", fd_, GetIP(), GetPort(),
+    //          (int)userCount);
+}
+
+int HttpConn::sockfd() const {
+    return sockfd_;
+}
+
+sockaddr_in HttpConn::addr() const {
+    return addr_;
+}
+
+const char* HttpConn::ip() const {
+    return inet_ntoa(addr_.sin_addr);
+}
+
+int HttpConn::port() const {
+    return addr_.sin_port;
+}
+
+ssize_t HttpConn::Read(int* save_errno) {
+    ssize_t len = -1;
+    // ET 模式下需要读到不能再读
+    while (true) {
+        len = read_buff_.ReadFd(sockfd_, save_errno);
+        if (len <= 0) {
+            break;
+        }
+    }
+    return len;  // 返回这个 len 干什么？
+}
+
+ssize_t HttpConn::Write(int* save_errno) {
+    ssize_t len = -1;
+    // ET 模式下需要写到不能再写
+    while (true) {
+        len = writev(sockfd_, iov_, iov_cnt_);
+        // 写到不能再写了
+        if (len <= 0) {
+            *save_errno = errno;
+            break;
+        }
+        // 写完了
+        if (iov_[0].iov_len + iov_[1].iov_len == 0) {
+            break;
+        } 
+        // 响应头中的字节已经写入完毕
+        else if (static_cast<size_t>(len) > iov_[0].iov_len) {
+            iov_[1].iov_base = (uint8_t*)iov_[1].iov_base +
+                               (len - iov_[0].iov_len);  // char* 也可以吧？
+            iov_[1].iov_len -= (len - iov_[0].iov_len);
+            if (iov_[0].iov_len) {
+                write_buff_.RetrieveAll();
+                iov_[0].iov_len = 0;
+            }
+        } 
+        // 响应头中的字节尚未写入完毕
+        else {
+            iov_[0].iov_base = (uint8_t*)iov_[0].iov_base + len;
+            iov_[0].iov_len -= len;
+            write_buff_.Retrieve(len);
+        }
+    }
+    return len;
+}
+
+bool HttpConn::Process() {
+    request_.Init();
+    if (read_buff_.ReadableBytes() <= 0) {
+        return false;
+    }
+    else if (request_.parse(read_buff_)) {
+        // LOG_DEBUG("%s", request_.path().c_str());
+        response_.Init(kSrcDir_, request_.path(), request_.IsKeepAlive(), 200);
+    } else {
+        response_.Init(kSrcDir_, request_.path(), false, 400);
+    }
+
+    // 响应头
+    response_.MakeResponse(write_buff_);
+    iov_[0].iov_base = const_cast<char*>(write_buff_.Peek());
+    iov_[0].iov_len = write_buff_.ReadableBytes();
+    iov_cnt_ = 1;
+
+    // 文件（响应体）
+
+
+
+}
