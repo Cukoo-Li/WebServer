@@ -22,6 +22,7 @@ void TimerHeap::SwapNode(size_t i, size_t j) {
 }
 
 // 这看着跟“小元素不断下坠”的代码很像
+// 只是判断了下标为 index 的元素是否需要下坠，没有进行结点的交换
 bool TimerHeap::SiftDown(size_t index, size_t n) {
     assert(index < heap_.size());
     assert(n <= heap_.size());
