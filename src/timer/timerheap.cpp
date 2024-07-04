@@ -21,8 +21,7 @@ void TimerHeap::SwapNode(size_t i, size_t j) {
     ref_[heap_[j].id] = j;
 }
 
-// 这看着跟“小元素不断下坠”的代码很像
-// 只是判断了下标为 index 的元素是否需要下坠，没有进行结点的交换
+// 以 index 为根的堆仅在根结点位置不满足小根堆性质，需要调整（根结点不断下坠）
 bool TimerHeap::SiftDown(size_t index, size_t n) {
     assert(index < heap_.size());
     assert(n <= heap_.size());
@@ -35,6 +34,7 @@ bool TimerHeap::SiftDown(size_t index, size_t n) {
         if (heap_[i] < heap_[j]) {
             break;
         }
+        SwapNode(i, j);
         i = j;
         j = i * 2 + 1;
     }
