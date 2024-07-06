@@ -54,6 +54,7 @@ int HttpConn::port() const {
     return addr_.sin_port;
 }
 
+// 
 ssize_t HttpConn::Read(int* save_errno) {
     ssize_t len = -1;
     // ET 模式下需要读到不能再读
@@ -66,6 +67,7 @@ ssize_t HttpConn::Read(int* save_errno) {
     return len;  // 返回这个 len 干什么？
 }
 
+//
 ssize_t HttpConn::Write(int* save_errno) {
     ssize_t len = -1;
     // ET 模式下需要写到不能再写
@@ -79,7 +81,7 @@ ssize_t HttpConn::Write(int* save_errno) {
         // 写完了
         if (iov_[0].iov_len + iov_[1].iov_len == 0) {
             break;
-        } 
+        }
         // 响应头中的字节已经写入完毕
         else if (static_cast<size_t>(len) > iov_[0].iov_len) {
             iov_[1].iov_base = (uint8_t*)iov_[1].iov_base +
@@ -89,7 +91,7 @@ ssize_t HttpConn::Write(int* save_errno) {
                 write_buff_.RetrieveAll();
                 iov_[0].iov_len = 0;
             }
-        } 
+        }
         // 响应头中的字节尚未写入完毕
         else {
             iov_[0].iov_base = (uint8_t*)iov_[0].iov_base + len;
@@ -100,12 +102,12 @@ ssize_t HttpConn::Write(int* save_errno) {
     return len;
 }
 
+// 
 bool HttpConn::Process() {
     request_.Init();
     if (read_buff_.ReadableBytes() <= 0) {
         return false;
-    }
-    else if (request_.parse(read_buff_)) {
+    } else if (request_.parse(read_buff_)) {
         // LOG_DEBUG("%s", request_.path().c_str());
         response_.Init(kSrcDir_, request_.path(), request_.IsKeepAlive(), 200);
     } else {
@@ -119,7 +121,20 @@ bool HttpConn::Process() {
     iov_cnt_ = 1;
 
     // 文件（响应体）
+    if (response_.file_size() > 0 && response_.file_addr()) {
+        iov_[1].iov_base = response_.file_addr();
+        iov_[1].iov_len = response_.file_size();
+        iov_cnt_ = 2;
+    }
+    // LOG_DEBUG("filesize:%d, %d  to %d", response_.file_size() , iov_cnt_,
+    // ToWriteBytes());
+    return true;
+}
 
+int HttpConn::ToWriteBytes() {
+    return iov_[0].iov_len + iov_[1].iov_len;
+}
 
-
+bool HttpConn::IsKeepAlive() const {
+    return request_.IsKeepAlive();
 }

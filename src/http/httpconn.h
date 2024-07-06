@@ -38,9 +38,9 @@ class HttpConn {
 
     bool Process();
 
-    int ToWriteBytes() { return iov_[0].iov_len + iov_[1].iov_len; }
+    int ToWriteBytes();
 
-    bool IsKeepAlive() const { return request_.IsKeepAlive(); }
+    bool IsKeepAlive() const;
 
     static bool is_et_;
     static const char* kSrcDir_;

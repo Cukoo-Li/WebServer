@@ -28,11 +28,11 @@ class HttpRequest {
         CLOSED_CONNECTION,
     };
 
-    HttpRequest() { Init(); }
+    HttpRequest(); 
     ~HttpRequest() = default;
 
     void Init();
-    bool parse(Buffer& buff);
+    bool Parse(Buffer& buff);
 
     std::string path() const;
     std::string& path();
@@ -61,8 +61,8 @@ class HttpRequest {
     std::string path_;
     std::string version_;
     std::string body_;
-    std::unordered_map<std::string, std::string> header_;
-    std::unordered_map<std::string, std::string> post_;
+    std::unordered_map<std::string, std::string> header_;       // ???
+    std::unordered_map<std::string, std::string> post_;         // ???
 
     static const std::unordered_set<std::string> kDefaultHtml_;
     static const std::unordered_map<std::string, int> kDefaultHtmlTag_;

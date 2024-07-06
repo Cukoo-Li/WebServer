@@ -1,8 +1,10 @@
 {
-    "C_Cpp.default.compilerPath": "/usr/bin/g++",
-    "files.associations": {
-        "vector": "cpp",
-        "condition_variable": "cpp",
-        "chrono": "cpp"
-    }
+    "clangd.arguments": [
+        "--header-insertion=never",
+        "--completion-style=detailed"
+    ],
+    "clangd.fallbackFlags": [
+        "-std=c++17",
+        "-I${workspaceFolder}/src/includes",
+    ]
 }
