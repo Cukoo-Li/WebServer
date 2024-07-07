@@ -15,7 +15,7 @@
 
 class HttpRequest {
    public:
-    enum class ParseState { REQUEST_LINE, HEADERS, BODY, FINISH };
+    enum class ParseState { REQUEST_LINE, REQUEST_HEADERS, REQUEST_BODY, FINISH };
 
     enum class HttpCode {
         NO_REQUEST,
@@ -32,21 +32,21 @@ class HttpRequest {
     ~HttpRequest() = default;
 
     void Init();
-    bool Parse(Buffer& buff);
 
     std::string path() const;
     std::string& path();
     std::string method() const;
     std::string version() const;
-    std::string GetPost(const std::string& key) const;  // ???
-    std::string GetPost(const char* key) const;         // ???
-
+    std::string GetPostRequestParm(const std::string& key) const;
+    std::string GetPostRequestParm(const char* key) const;
     bool IsKeepAlive() const;
+    
+    bool Parse(Buffer& buff);
 
    private:
     bool ParseRequestLine(const std::string& line);
-    void ParseHeader(const std::string& line);
-    void ParseBody(const std::string& line);
+    void ParseRequestHeader(const std::string& line);
+    void ParseRequestBody(const std::string& line);
 
     void ParsePath();
     void ParsePost();

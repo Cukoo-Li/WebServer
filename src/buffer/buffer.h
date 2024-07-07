@@ -16,20 +16,20 @@ class Buffer {
 
     size_t WritableBytes() const;
     size_t ReadableBytes() const;
-    size_t PrependableBytes() const;    // ???
+    size_t PrependableBytes() const;    
 
-    const char* Peek() const;   // ???
-    void EnsureWritable(size_t len);    // ???
-    void HasWritten(size_t len);    // ???
+    const char* ReadBegin() const;   
+    void EnsureWritable(size_t len);    
+    void HasWritten(size_t len);    
 
-    void Retrieve(size_t len);      // ???
-    void RetrieveUntil(const char* end);    // ???
+    void Retrieve(size_t len);    
+    void RetrieveUntil(const char* end);    
 
-    void RetrieveAll();         // ???
-    std::string RetrieveAlltoStr();     // ???
+    void RetrieveAll();        
+    std::string RetrieveAlltoStr();     
 
-    const char* BeginWriteConst() const;    // ???
-    char* BeginWrite();
+    const char* ConstWriteBegin() const;   
+    char* WriteBegin();
 
     void Append(const std::string& str);
     void Append(const char* str, size_t len);
@@ -40,8 +40,8 @@ class Buffer {
     ssize_t WriteFd(int fd, int* save_errno);
 
     private:
-    char* BeginPtr();
-    const char* BeginPtr() const;
+    char* Begin();
+    const char* Begin() const;
     void MakeSpace(size_t len);
 
     std::vector<char> buffer_;
