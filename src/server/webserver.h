@@ -17,22 +17,22 @@
 #include "../pool/threadpool.h"
 #include "../pool/sqlconnguard.h"
 #include "../http/httpconn.h"
+#include "../config/config.h"
 
 class WebServer {
     public:
-    WebServer(int port, int timeout, bool enable_linger, int sql_port, const char* sql_user, const char* sql_pwd, const char* db_name, int sql_conn_pool_size, int thread_pool_size, bool enable_log, int log_level, int log_que_size);
+    WebServer(Config config);
     ~WebServer();
 
     void Startup();
 
     private:
     bool InitSocket();
-    void InitEventMode();
     void AddClient(int fd, sockaddr_in addr);
 
-    void DealListen();
-    void DealRead(HttpConn* client);
-    void DealWrite(HttpConn* client);
+    void HandleListenFdEvent();
+    void HandleReadableEvent(HttpConn* client);
+    void HandleWritableEvent(HttpConn* client);
 
     void SendError(int fd, const char* info);
     void ExtentTime(HttpConn* client);
@@ -46,15 +46,15 @@ class WebServer {
 
     static int SetFdNonblock(int fd);
 
-    int port_;
-    bool open_linger_;
-    int timeout_;
+    const int kPort_;
+    const int kTimeout_;
+    const bool kEnableLinger_;
+    const std::string kWorkDir_;
     bool is_closed_;
-    int listen_fd_;
-    const char* src_dir_;
+    int listenfd_;
 
-    uint32_t listen_event_;
-    uint32_t conn_event_;
+    uint32_t listenfd_event_;
+    uint32_t connfd_event_;
 
     std::unique_ptr<TimerHeap> timer_heap_;
     std::unique_ptr<ThreadPool> thread_pool_;

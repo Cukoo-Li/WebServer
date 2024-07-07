@@ -12,7 +12,7 @@ void SqlConnPool::Init(const char* host,
                        const char* user,
                        const char* pwd,
                        const char* db_name,
-                       int conn_num = 8) {
+                       int conn_num) {
     assert(conn_num > 0);
     for (int i = 0; i < conn_num; ++i) {
         MYSQL* sql = nullptr;

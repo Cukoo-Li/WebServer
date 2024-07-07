@@ -6,6 +6,7 @@
 #include <queue>
 #include <thread>
 #include <functional>
+#include <assert.h>
 
 // 后面改成不 detach 吧
 class ThreadPool {

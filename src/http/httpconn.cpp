@@ -1,7 +1,6 @@
 #include "httpconn.h"
 
-bool HttpConn::is_et_ = true;
-const char* HttpConn::kSrcDir_ = nullptr;
+const char* HttpConn::kWorkDir_ = nullptr;
 std::atomic<int> HttpConn::client_count_{};
 
 HttpConn::HttpConn() {
@@ -27,7 +26,6 @@ void HttpConn::Init(int sockfd, const sockaddr_in& addr) {
 }
 
 void HttpConn::Close() {
-    response_.UnmapFile();
     if (is_closed_) {
         return;
     }
