@@ -14,17 +14,17 @@ HttpRequest::HttpRequest() {
 }
 
 void HttpRequest::Init() {
-    method_ = path_ = version_ = body_ = "";
-    header_.clear();
-    post_.clear();
+    method_ = url_ = version_ = body_ = "";
+    headers_.clear();
+    post_request_parms_.clear();
 }
 
-std::string HttpRequest::path() const {
-    return path_;
+std::string HttpRequest::url() const {
+    return url_;
 }
 
-std::string& HttpRequest::path() {
-    return path_;
+std::string& HttpRequest::url() {
+    return url_;
 }
 
 std::string HttpRequest::method() const {
@@ -37,8 +37,8 @@ std::string HttpRequest::version() const {
 
 std::string HttpRequest::GetPostRequestParm(const std::string& key) const {
     assert(key != "");
-    if (post_.count(key) == 1) {
-        return post_.at(key);
+    if (post_request_parms_.count(key) == 1) {
+        return post_request_parms_.at(key);
     }
     return "";
 }
@@ -49,8 +49,8 @@ std::string HttpRequest::GetPostRequestParm(const char *key) const {
 }
 
 bool HttpRequest::IsKeepAlive() const {
-    if (header_.count("Connection") == 1) {
-        return header_.at("Connection") == "keep-alive" && version_ == "1.1";
+    if (headers_.count("Connection") == 1) {
+        return headers_.at("Connection") == "keep-alive" && version_ == "1.1";
     }
     return false;
 }
@@ -67,21 +67,21 @@ bool HttpRequest::Parse(Buffer& buff) {
             buff.ReadBegin(), buff.ConstWriteBegin(), CRLF, CRLF + 2);
         std::string line(buff.ReadBegin(), line_end);
         switch (state_) {
-            case ParseState::REQUEST_LINE:
-                if (!ParseRequestLine(line)) {
+            case ParseState::START_LINE:
+                if (!ParseStartLine(line)) {
                     return false;
                 }
-                ParsePath();
+                ParseUrl();
                 break;
-            case ParseState::REQUEST_HEADERS:
-                ParseRequestHeader(line);
+            case ParseState::HEADERS:
+                ParseHeaders(line);
                 // 这个条件是否有问题
                 if (buff.ReadableBytes() <= 2) {
                     state_ = ParseState::FINISH;
                 }
                 break;
-            case ParseState::REQUEST_BODY:
-                ParseRequestBody(line);
+            case ParseState::BODY:
+                ParseBody(line);
                 break;
             default:
                 break;
@@ -93,18 +93,18 @@ bool HttpRequest::Parse(Buffer& buff) {
 
         buff.RetrieveUntil(line_end + 2);
     }
-    // LOG_DEBUG("[%s], [%s], [%s]", method_.c_str(), path_.c_str(),
+    // LOG_DEBUG("[%s], [%s], [%s]", method_.c_str(), url_.c_str(),
     // version_.c_str());
     return true;
 }
 
-void HttpRequest::ParsePath() {
-    if (path_ == "/") {
-        path_ = "/index.html";
+void HttpRequest::ParseUrl() {
+    if (url_ == "/") {
+        url_ = "/index.html";
     } else {
         for (auto& item : kDefaultHtml_) {
-            if (item == path_) {
-                path_ += ".html";
+            if (item == url_) {
+                url_ += ".html";
                 break;
             }
         }
@@ -112,14 +112,14 @@ void HttpRequest::ParsePath() {
 }
 
 // 重点理解
-bool HttpRequest::ParseRequestLine(const std::string& line) {
+bool HttpRequest::ParseStartLine(const std::string& line) {
     std::regex pattern("^([^ ]*) ([^ ]*) HTTP/([^ ]*)$");
     std::smatch sub_match;
     if (std::regex_match(line, sub_match, pattern)) {
         method_ = sub_match[1];
-        path_ = sub_match[2];
+        url_ = sub_match[2];
         version_ = sub_match[3];
-        state_ = ParseState::REQUEST_HEADERS;
+        state_ = ParseState::HEADERS;
         return true;
     }
     // LOG_ERROR("RequestLine Error");
@@ -127,17 +127,17 @@ bool HttpRequest::ParseRequestLine(const std::string& line) {
 }
 
 // 重点理解
-void HttpRequest::ParseRequestHeader(const std::string& line) {
+void HttpRequest::ParseHeaders(const std::string& line) {
     std::regex pattern("^([^:]*): ?(.*)$");
     std::smatch sub_match;
     if (std::regex_match(line, sub_match, pattern)) {
-        header_[sub_match[1]] = sub_match[2];
+        headers_[sub_match[1]] = sub_match[2];
     } else {
-        state_ = ParseState::REQUEST_BODY;
+        state_ = ParseState::BODY;
     }
 }
 
-void HttpRequest::ParseRequestBody(const std::string& line) {
+void HttpRequest::ParseBody(const std::string& line) {
     body_ = line;
     ParsePost();
     state_ = ParseState::FINISH;
@@ -155,18 +155,18 @@ int HttpRequest::ConverHex(char ch) {
 
 void HttpRequest::ParsePost() {
     if (method_ == "Post" &&
-        header_["Content-Type"] == "application/x-www-form-urlencoded") {
+        headers_["Content-Type"] == "application/x-www-form-urlencoded") {
         ParseFromUrlencoded();
-        if (kDefaultHtmlTag_.count(path_)) {
-            int tag = kDefaultHtmlTag_.at(path_);
+        if (kDefaultHtmlTag_.count(url_)) {
+            int tag = kDefaultHtmlTag_.at(url_);
             // LOG_DEBUG("Tag:%d", tag);
             if (tag == 0 || tag == 1) {
                 bool is_login = (tag == 1);
-                if (UserVerify(post_["username"], post_["password"],
+                if (UserVerify(post_request_parms_["username"], post_request_parms_["password"],
                                is_login)) {
-                    path_ = "/welcome.html";
+                    url_ = "/welcome.html";
                 } else {
-                    path_ = "/error.html";
+                    url_ = "/error.html";
                 }
             }
         }
@@ -202,7 +202,7 @@ void HttpRequest::ParseFromUrlencoded() {
             case '&':
                 value = body_.substr(j, i - j);
                 j = i + 1;
-                post_[key] = value;
+                post_request_parms_[key] = value;
                 // LOG_DEBUG("%s = %s", key.c_str(), value.c_str());
                 break;
             default:
@@ -210,9 +210,9 @@ void HttpRequest::ParseFromUrlencoded() {
         }
     }
     assert(j <= i);
-    if (post_.count(key) == 0 && j < i) {
+    if (post_request_parms_.count(key) == 0 && j < i) {
         value = body_.substr(j, i - j);
-        post_[key] = value;
+        post_request_parms_[key] = value;
     }
 }
 

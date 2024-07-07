@@ -33,7 +33,7 @@ class Buffer {
 
     void Append(const std::string& str);
     void Append(const char* str, size_t len);
-    void Append(const void* data, size_t len);
+    // void Append(const void* data, size_t len);
     void Append(const Buffer& buff);
 
     ssize_t ReadFd(int fd, int* save_errno);
