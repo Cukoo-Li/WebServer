@@ -27,24 +27,22 @@ class WebServer {
     void Startup();
 
     private:
-    bool InitSocket();
-    void AddClient(int fd, sockaddr_in addr);
+    static const int kMaxFd_ = 65536;
+    static int SetFdNonblock(int fd);
+
+    bool InitListenSocket();
 
     void HandleListenFdEvent();
     void HandleReadableEvent(HttpConn* client);
     void HandleWritableEvent(HttpConn* client);
 
     void SendError(int fd, const char* info);
-    void ExtentTime(HttpConn* client);
+    void ResetTimer(HttpConn* client);
     void CloseConn(HttpConn* client);
 
     void OnRead(HttpConn* client);
     void OnWrite(HttpConn* client);
     void OnProcess(HttpConn* client);
-
-    static const int kMaxFd = 65536;
-
-    static int SetFdNonblock(int fd);
 
     const int kPort_;
     const int kTimeout_;

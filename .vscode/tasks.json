@@ -1,28 +1,36 @@
 {
+    "version": "2.0.0",
     "tasks": [
+        // 基于CMake的多文件编译
         {
-            "type": "cppbuild",
-            "label": "单文件编译",
-            "command": "/usr/bin/g++",
+            "type": "shell",
+            "label": "cmake",
+            "command": "cmake",
             "args": [
-                "-fdiagnostics-color=always",
-                "-g",
-                "${file}",
-                "-o",
-                "${workspaceRoot}/build/${fileBasenameNoExtension}"
+                ".",
+                "-B",
+                "../build",
             ],
             "options": {
-                "cwd": "${fileDirname}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "detail": "调试器生成的任务。"
+                "cwd": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "type": "shell",
+            "label": "make",
+            "command": "make",
+            "args": [],
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            }
+        },
+        {
+            "label": "基于CMake的多文件编译",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "cmake",
+                "make"
+            ]
         }
-    ],
-    "version": "2.0.0"
+    ]
 }

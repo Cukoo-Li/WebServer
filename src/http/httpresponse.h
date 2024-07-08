@@ -22,7 +22,7 @@ class HttpResponse {
     void MakeResponse(Buffer& buff);
     void UnmapFile();
 
-    const void* file_addr() const;
+    void* file_addr() const;
     size_t file_size() const;
     std::string file_type() const;
     int code() const;

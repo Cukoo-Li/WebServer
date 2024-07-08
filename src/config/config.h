@@ -2,17 +2,17 @@
 #define CONFIG_H
 
 struct Config {
-    const char* work_dir;
-    int port;
-    bool enable_linger;
-    int timeout;    // 客户连接超时时间
-    const char* host;
-    int sql_port;
-    const char* sql_user;
-    const char* sql_pwd;
-    const char* db_name;
-    int sql_conn_pool_size;
-    int thread_pool_size;
+    const char* work_dir = "/home/cukoo/文档/GitHub-Repositories/WebServer-Modern-Cpp/resources";
+    int port = 1027;
+    bool enable_linger = true;
+    int timeout = 10000;    // 客户连接超时时间
+    const char* host = "localhost";
+    int sql_port = 3306;
+    const char* sql_user = "root";
+    const char* sql_pwd = "root";
+    const char* db_name = "webserver";
+    int sql_conn_pool_size = 8;
+    int thread_pool_size = 8;
     // bool enable_log;
     // int log_level;
     // int log_que_size;

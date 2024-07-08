@@ -15,7 +15,9 @@ HttpConn::~HttpConn() {
 
 void HttpConn::Init(int sockfd, const sockaddr_in& addr) {
     assert(sockfd > 0);
-    ++client_count_;
+    if (is_closed_) {
+        ++client_count_;
+    }
     addr_ = addr;
     sockfd_ = sockfd;
     write_buff_.RetrieveAll();
@@ -52,7 +54,7 @@ int HttpConn::port() const {
     return addr_.sin_port;
 }
 
-// 
+//
 ssize_t HttpConn::Read(int* save_errno) {
     ssize_t len = -1;
     // ET 模式下需要读到不能再读
@@ -62,7 +64,7 @@ ssize_t HttpConn::Read(int* save_errno) {
             break;
         }
     }
-    return len;  // 返回这个 len 干什么？
+    return len;
 }
 
 //
@@ -71,13 +73,13 @@ ssize_t HttpConn::Write(int* save_errno) {
     // ET 模式下需要写到不能再写
     while (true) {
         len = writev(sockfd_, iov_, iov_cnt_);
-        // 写到不能再写了
-        if (len <= 0) {
+        if (len == -1) {
+            // 写到不能再写了（发送缓冲区已满）
             *save_errno = errno;
             break;
         }
-        // 写完了
         if (iov_[0].iov_len + iov_[1].iov_len == 0) {
+            // 写完了
             break;
         }
         // 响应头中的字节已经写入完毕
@@ -100,21 +102,21 @@ ssize_t HttpConn::Write(int* save_errno) {
     return len;
 }
 
-// 
+//
 bool HttpConn::Process() {
     request_.Init();
     if (read_buff_.ReadableBytes() <= 0) {
         return false;
-    } else if (request_.parse(read_buff_)) {
+    } else if (request_.Parse(read_buff_)) {
         // LOG_DEBUG("%s", request_.path().c_str());
-        response_.Init(kSrcDir_, request_.path(), request_.IsKeepAlive(), 200);
+        response_.Init(kWorkDir_, request_.url(), request_.IsKeepAlive(), 200);
     } else {
-        response_.Init(kSrcDir_, request_.path(), false, 400);
+        response_.Init(kWorkDir_, request_.url(), false, 400);
     }
 
     // 响应头
     response_.MakeResponse(write_buff_);
-    iov_[0].iov_base = const_cast<char*>(write_buff_.Peek());
+    iov_[0].iov_base = const_cast<char*>(write_buff_.ReadBegin());
     iov_[0].iov_len = write_buff_.ReadableBytes();
     iov_cnt_ = 1;
 

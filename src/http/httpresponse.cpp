@@ -79,7 +79,7 @@ void HttpResponse::MakeResponse(Buffer& buff) {
     AddBody(buff);
 }
 
-const void* HttpResponse::file_addr() const {
+void* HttpResponse::file_addr() const {
     return file_addr_;
 }
 

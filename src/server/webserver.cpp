@@ -1,5 +1,10 @@
 #include "webserver.h"
 
+int WebServer::SetFdNonblock(int fd) {
+    assert(fd > 0);
+    return fcntl(fd, F_SETFL, fcntl(fd, F_GETFD, 0) | O_NONBLOCK);
+}
+
 WebServer::WebServer(Config config)
     : kWorkDir_(config.work_dir),
       kPort_(config.port),
@@ -14,7 +19,7 @@ WebServer::WebServer(Config config)
                                   config.sql_conn_pool_size);
     listenfd_event_ = EPOLLET | EPOLLRDHUP;
     connfd_event_ = EPOLLONESHOT | EPOLLET | EPOLLRDHUP;
-    if (!InitSocket()) {
+    if (!InitListenSocket()) {
         is_closed_ = true;
     }
 
@@ -80,7 +85,7 @@ void WebServer::Startup() {
 }
 
 // 创建 listenfd_
-bool WebServer::InitSocket() {
+bool WebServer::InitListenSocket() {
     // 1. 创建 socket
     listenfd_ = socket(AF_INET, SOCK_STREAM, 0);
     assert(listenfd_ >= 0);
@@ -105,7 +110,6 @@ bool WebServer::InitSocket() {
     ret = setsockopt(listenfd_, SOL_SOCKET, SO_REUSEADDR, &opt_reuse,
                      sizeof(opt_reuse));
     assert(ret >= 0);
-
     ret = bind(listenfd_, (sockaddr*)&addr, sizeof(addr));
     assert(ret >= 0);
 
@@ -113,7 +117,8 @@ bool WebServer::InitSocket() {
     ret = listen(listenfd_, 5);
     assert(ret >= 0);
 
-    ret = epoller_->AddFd(listenfd_, listenfd_event_ | EPOLLIN);
+    // 注册事件
+    ret = epoller_->Add(listenfd_, listenfd_event_ | EPOLLIN);
     assert(ret == 1);
 
     SetFdNonblock(listenfd_);
@@ -121,7 +126,104 @@ bool WebServer::InitSocket() {
     return true;
 }
 
-int WebServer::SetFdNonblock(int fd) {
-    assert(fd > 0);
-    return fcntl(fd, F_SETFL, fcntl(fd, F_GETFD, 0) | O_NONBLOCK);
+void WebServer::SendError(int fd, const char* message) {
+    assert(fd >= 0);
+    int ret = send(fd, message, strlen(message), 0);
+    if (ret < 0) {
+        // LOG_WARN("send error to client[%d] error!", fd);
+    }
+    close(fd);
+}
+
+void WebServer::CloseConn(HttpConn* client) {
+    assert(client);
+    // LOG_INFO("Client[%d] quit!", client->sockfd());
+    epoller_->Remove(client->sockfd());
+    client->Close();
+}
+
+void WebServer::HandleListenFdEvent() {
+    sockaddr_in addr{};
+    socklen_t addr_len = sizeof(addr);
+    while (true) {
+        int fd = accept(listenfd_, (sockaddr*)&addr, &addr_len);
+        if (fd < 0) {
+            // listenfd_ 不可读了，此时 errno == EAGAIN || errno == EWOULDBLOCK
+            return;
+        }
+        if (HttpConn::client_count_ >= kMaxFd_) {
+            SendError(fd, "Server is busy!");
+            // LOG_WARN("Clients is full!");
+            return;
+        }
+        // 创建 HttpConn
+        clients_[fd].Init(fd, addr);
+        // 创建定时器
+        if (kTimeout_ > 0) {
+            timer_heap_->Add(
+                fd, kTimeout_,
+                std::bind(&WebServer::CloseConn, this, &clients_[fd]));
+        }
+        // 注册事件
+        epoller_->Add(fd, EPOLLIN | connfd_event_);
+        SetFdNonblock(fd);
+        // LOG_INFO("Client[%d] in!", clients_[fd].sockfd());
+    }
+}
+
+void WebServer::HandleReadableEvent(HttpConn* client) {
+    assert(client);
+    ResetTimer(client);
+    thread_pool_->AddTask(std::bind(&WebServer::OnRead, this, client));
+}
+
+void WebServer::HandleWritableEvent(HttpConn* client) {
+    assert(client);
+    ResetTimer(client);
+    thread_pool_->AddTask(std::bind(&WebServer::OnWrite, this, client));
+}
+
+void WebServer::ResetTimer(HttpConn* client) {
+    assert(client);
+    if (kTimeout_ > 0) {
+        timer_heap_->Adjust(client->sockfd(), kTimeout_);
+    }
+}
+
+void WebServer::OnRead(HttpConn* client) {
+    assert(client);
+    int ret = -1;
+    int read_errno = 0;
+    ret = client->Read(&read_errno);
+    if (ret < 0 && read_errno != EAGAIN) {
+        CloseConn(client);
+        return;
+    }
+    OnProcess(client);
+}
+
+void WebServer::OnProcess(HttpConn* client) {
+    if (client->Process()) {
+        epoller_->Modify(client->sockfd(), connfd_event_ | EPOLLOUT);
+    } else {
+        epoller_->Modify(client->sockfd(), connfd_event_ | EPOLLIN);
+    }
+}
+
+void WebServer::OnWrite(HttpConn* client) {
+    assert(client);
+    int ret = -1;
+    int write_errno = 0;
+    ret = client->Write(&write_errno);
+    if (client->ToWriteBytes() == 0 && client->IsKeepAlive()) {
+        // 传输完成，但需要保持连接
+        OnProcess(client);  // 实际上只是清空了 HttpRequst 对象
+        return;
+    }
+    if (ret == -1 && write_errno == EAGAIN) {
+        // 未传输完成，需要等下一次可写
+        epoller_->Modify(client->sockfd(), connfd_event_ || EPOLLOUT);
+        return;
+    }
+    CloseConn(client);
 }

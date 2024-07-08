@@ -1,5 +1,5 @@
-#ifndef THREAD_POOL_H
-#define THREAD_POOL_H
+#ifndef THREAD_DATA_H
+#define THREAD_DATA_H
 
 #include <mutex>
 #include <condition_variable>
@@ -11,23 +11,23 @@
 // 后面改成不 detach 吧
 class ThreadPool {
    public:
-    explicit ThreadPool(int thread_num = 8) : pool_(std::make_shared<Pool>()) {
+    explicit ThreadPool(int thread_num = 8) : data_(std::make_shared<Data>()) {
         assert(thread_num > 0);
         for (int i = 0; i < thread_num; ++i) {
-            std::thread([pool = pool_] {
-                std::unique_lock<std::mutex> locker(pool->mtx);
+            std::thread([data = data_] {
+                std::unique_lock<std::mutex> locker(data->mtx);
                 while (true) {
-                    if (pool->is_stopped)
+                    if (data->is_stopped)
                         break;
-                    if (!pool->tasks_que_.empty()) {
+                    if (!data->tasks_.empty()) {
                         auto task =
-                            std::move(pool->tasks_que_.front());  // 有必要 move 吗？
-                        pool->tasks_que_.pop();
+                            std::move(data->tasks_.front());  // 有必要 move 吗？
+                        data->tasks_.pop();
                         locker.unlock();
                         task();
                         locker.lock();
                     } else {
-                        pool->cv.wait(locker);
+                        data->cv.wait(locker);
                     }
                 }
             }).detach();
@@ -39,31 +39,31 @@ class ThreadPool {
     ThreadPool(ThreadPool&&) = default;
 
     ~ThreadPool() {
-        if (pool_) {
-            std::unique_lock<std::mutex> locker(pool_->mtx);
-            pool_->is_stopped = true;
+        if (data_) {
+            std::unique_lock<std::mutex> locker(data_->mtx);
+            data_->is_stopped = true;
             locker.unlock();
-            pool_->cv.notify_all();
+            data_->cv.notify_all();
         }
     }
 
     // 还完美转发？
     template<typename F>
     void AddTask(F&& task) {
-        std::unique_lock<std::mutex> locker(pool_->mtx);
-        pool_->tasks_que_.emplace(std::forward<F>(task));
+        std::unique_lock<std::mutex> locker(data_->mtx);
+        data_->tasks_.emplace(std::forward<F>(task));
         locker.unlock();
-        pool_->cv.notify_one();
+        data_->cv.notify_one();
     }
 
    private:
-    struct Pool {
+    struct Data {
         std::mutex mtx;
         std::condition_variable cv;
         bool is_stopped;
-        std::queue<std::function<void()>> tasks_que_;
+        std::queue<std::function<void()>> tasks_;
     };
-    std::shared_ptr<Pool> pool_;
+    std::shared_ptr<Data> data_;
 };
 
 #endif

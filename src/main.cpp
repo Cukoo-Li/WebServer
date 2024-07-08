@@ -1,8 +1,10 @@
 #include <iostream>
 
 #include "server/webserver.h"
+#include "config/config.h"
 
 int main() {
-    WebServer server;
+    Config config;
+    WebServer server(config);
     server.Startup();
 }

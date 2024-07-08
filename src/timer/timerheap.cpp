@@ -1,5 +1,12 @@
 #include "timerheap.h"
 
+TimerHeap::TimerHeap() {
+}
+
+TimerHeap::~TimerHeap() {
+    Clear();
+}
+
 void TimerHeap::SiftUp(size_t i) {
     assert(i < heap_.size());
     size_t j = (i - 1) / 2;

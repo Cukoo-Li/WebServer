@@ -8,10 +8,10 @@
             "name": "Debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/build/${fileBasenameNoExtension}",
+            "program": "${workspaceRoot}/build/webserver",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${fileDirname}",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -27,7 +27,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "单文件编译",
+            "preLaunchTask": "基于CMake的多文件编译",
             "miDebuggerArgs": "-q -ex quit; wait() { fg >/dev/null; }; /bin/gdb -q --interpreter=mi"
         }
 
