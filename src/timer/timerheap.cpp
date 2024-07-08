@@ -9,9 +9,9 @@ TimerHeap::~TimerHeap() {
 
 void TimerHeap::SiftUp(size_t i) {
     assert(i < heap_.size());
-    size_t j = (i - 1) / 2;
+    int j = (static_cast<int>(i) - 1) / 2;
     while (j >= 0) {
-        if (heap_[j] < heap_[i]) {
+        if (heap_[j] <= heap_[i]) {
             break;
         }
         SwapNode(i, j);
@@ -35,10 +35,10 @@ bool TimerHeap::SiftDown(size_t index, size_t n) {
     size_t i = index;
     size_t j = i * 2 + 1;
     while (j < n) {
-        if (j + 1 < n && heap_[j + 1] < heap_[j]) {
+        if (j + 1 < n && heap_[j + 1] <= heap_[j]) {
             ++j;
         }
-        if (heap_[i] < heap_[j]) {
+        if (heap_[i] <= heap_[j]) {
             break;
         }
         SwapNode(i, j);
