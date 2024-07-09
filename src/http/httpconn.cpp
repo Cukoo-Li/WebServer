@@ -104,13 +104,25 @@ ssize_t HttpConn::Write(int* save_errno) {
 
 //
 bool HttpConn::Process() {
-    request_.Init();
+    // 准备下一次请求
+    if (request_.state() == HttpRequest::ParseState::FINISH) {
+        request_.Init();
+    }
     if (read_buff_.ReadableBytes() <= 0) {
         return false;
-    } else if (request_.Parse(read_buff_)) {
+    }
+    HttpRequest::HttpCode http_code = request_.Parse(read_buff_);
+    // 已接收到完整的请求报文
+    if (http_code == HttpRequest::HttpCode::GET_REQUEST) {
         // LOG_DEBUG("%s", request_.path().c_str());
         response_.Init(kWorkDir_, request_.url(), request_.IsKeepAlive(), 200);
-    } else {
+    }
+    // 请求报文不完整
+    else if (http_code == HttpRequest::HttpCode::NO_REQUEST) {
+        return false;
+    } 
+    // 请求报文解析发生错误
+    else {
         response_.Init(kWorkDir_, request_.url(), false, 400);
     }
 

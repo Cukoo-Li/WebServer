@@ -1,19 +1,24 @@
 #include "httprequest.h"
 
+// 保存默认页面名的静态变量，所有对以下 url 的请求都会加上 .html 后缀
 const std::unordered_set<std::string> HttpRequest::kDefaultHtml_{
     "/index", "/register", "/login", "/welcome", "/video", "/picture",
 };
 
+// 区分登录和注册的标志
 const std::unordered_map<std::string, int> HttpRequest::kDefaultHtmlTag_{
     {"/register.html", 0},
     {"/login.html", 1},
 };
 
+// 构造时请求信息默认初始化为空
 HttpRequest::HttpRequest() {
     Init();
 }
 
+// 将各请求信息重新初始化为空
 void HttpRequest::Init() {
+    state_ = ParseState::START_LINE;
     method_ = url_ = version_ = body_ = "";
     headers_.clear();
     post_request_parms_.clear();
@@ -35,17 +40,8 @@ std::string HttpRequest::version() const {
     return version_;
 }
 
-std::string HttpRequest::GetPostRequestParm(const std::string& key) const {
-    assert(key != "");
-    if (post_request_parms_.count(key) == 1) {
-        return post_request_parms_.at(key);
-    }
-    return "";
-}
-
-std::string HttpRequest::GetPostRequestParm(const char *key) const {
-    assert(key);
-    return GetPostRequestParm(std::string(key));
+HttpRequest::ParseState HttpRequest::state() const {
+    return state_;
 }
 
 bool HttpRequest::IsKeepAlive() const {
@@ -55,63 +51,88 @@ bool HttpRequest::IsKeepAlive() const {
     return false;
 }
 
-// 解析请求报文（重点理解）
-bool HttpRequest::Parse(Buffer& buff) {
-    const char CRLF[] = "\r\n";
-    if (buff.ReadableBytes() == 0) {
-        return false;
+// 按关键字获取指定 Post 请求参数
+std::string HttpRequest::GetPostRequestParm(const std::string& key) const {
+    assert(key != "");
+    if (post_request_parms_.count(key) == 1) {
+        return post_request_parms_.at(key);
     }
+    return "";
+}
+
+// 解析请求报文（重点理解）
+HttpRequest::HttpCode HttpRequest::Parse(Buffer& buff) {
+    const char CRLF[] = "\r\n";
+    // 如果读缓冲区中没有内容可以被读取，返回 NO_REQUEST，需要重置 EPOLLIN
+    // 等下次再读
+    if (buff.ReadableBytes() == 0) {
+        return HttpCode::NO_REQUEST;
+    }
+
+    // 状态机解析请求报文
     while (buff.ReadableBytes() && state_ != ParseState::FINISH) {
-        // 如果找不到 CRLF，line_end 就等于 buff.WriteBegin()
+        // 先尝试从读缓冲区中提取出一行
         const char* line_end = std::search(
             buff.ReadBegin(), buff.ConstWriteBegin(), CRLF, CRLF + 2);
+        // 如果找不到 CRLF，返回尾后指针，此时 line 并不是一个有效的行，返回
+        // NO_REQUEST，需要重置 EPOLLIN 等下次再读
+        if (line_end == buff.ConstWriteBegin() && state_ != ParseState::BODY) {
+            return HttpCode::NO_REQUEST;
+        }
         std::string line(buff.ReadBegin(), line_end);
+        // 根据当前状态决定解析方式
         switch (state_) {
+            // 解析请求行
             case ParseState::START_LINE:
                 if (!ParseStartLine(line)) {
-                    return false;
+                    return HttpCode::BAD_REQUEST;
                 }
-                ParseUrl();
+                ParseUrl();  // 将默认 url 补充完整
                 break;
+            // 解析请求头
             case ParseState::HEADERS:
-                ParseHeaders(line);
-                // 这个条件是否有问题
-                if (buff.ReadableBytes() <= 2) {
+                if (!ParseHeaders(line)) {
+                    return HttpCode::BAD_REQUEST;
+                }
+                // ParseHeaders 在遇到空行时会将 state_ 置为 BODY
+                // 如果是 GET 请求，就解析完毕了
+                if (state_ == ParseState::BODY && method_ == "GET") {
                     state_ = ParseState::FINISH;
+                    buff.RetrieveAll();
+                    return HttpCode::GET_REQUEST;
                 }
                 break;
+            // 解析请求体
             case ParseState::BODY:
-                ParseBody(line);
+                if (!ParseBody(line)) {
+                    return HttpCode::NO_REQUEST;
+                }
+                buff.RetrieveAll();
+                return HttpCode::GET_REQUEST;
                 break;
             default:
-                break;
+                return HttpCode::INTERNAL_ERROR;
         }
-        // 不是完整的一行，不更新 buff.ReadBegin()，下次再处理
-        if (line_end == buff.WriteBegin()) {
-            break;
-        }
-
         buff.RetrieveUntil(line_end + 2);
     }
     // LOG_DEBUG("[%s], [%s], [%s]", method_.c_str(), url_.c_str(),
     // version_.c_str());
-    return true;
+    return HttpCode::NO_REQUEST;
 }
 
+// 将默认 url 补充完整
 void HttpRequest::ParseUrl() {
     if (url_ == "/") {
         url_ = "/index.html";
-    } else {
-        for (auto& item : kDefaultHtml_) {
-            if (item == url_) {
-                url_ += ".html";
-                break;
-            }
-        }
+        return;
+    }
+    if (kDefaultHtml_.count(url_)) {
+        url_ += ".html";
+        return;
     }
 }
 
-// 重点理解
+// 解析请求行
 bool HttpRequest::ParseStartLine(const std::string& line) {
     std::regex pattern("^([^ ]*) ([^ ]*) HTTP/([^ ]*)$");
     std::smatch sub_match;
@@ -119,51 +140,54 @@ bool HttpRequest::ParseStartLine(const std::string& line) {
         method_ = sub_match[1];
         url_ = sub_match[2];
         version_ = sub_match[3];
-        state_ = ParseState::HEADERS;
+        state_ = ParseState::HEADERS;  // 切换状态
         return true;
     }
-    // LOG_ERROR("RequestLine Error");
+    // LOG_ERROR("StartLine Error! %s", line.c_str());
     return false;
 }
 
-// 重点理解
-void HttpRequest::ParseHeaders(const std::string& line) {
+// 解析请求头
+bool HttpRequest::ParseHeaders(const std::string& line) {
     std::regex pattern("^([^:]*): ?(.*)$");
     std::smatch sub_match;
     if (std::regex_match(line, sub_match, pattern)) {
         headers_[sub_match[1]] = sub_match[2];
-    } else {
+    } else if (line == "") {
         state_ = ParseState::BODY;
+    } else {
+        // LOG_ERROR("Headers Error! %s", line.c_str());
+        return false;
     }
+    return true;
 }
 
-void HttpRequest::ParseBody(const std::string& line) {
+// 解析请求体
+bool HttpRequest::ParseBody(const std::string& line) {
+    if (line.size() < stoi(headers_.at("Content-Length"))) {
+        return false;
+    }
     body_ = line;
     ParsePost();
     state_ = ParseState::FINISH;
     // LOG_DEBUG("Body:%s, len:%d", line.c_str(), line.size());
+    return true;
 }
 
-// ???
-int HttpRequest::ConverHex(char ch) {
-    if (ch >= 'A' && ch <= 'F')
-        return ch - 'A' + 10;
-    if (ch >= 'a' && ch <= 'f')
-        return ch - 'a' + 10;
-    return ch;
-}
-
+// 解析 Post 请求
 void HttpRequest::ParsePost() {
     if (method_ == "Post" &&
         headers_["Content-Type"] == "application/x-www-form-urlencoded") {
+        // 将请求体解析成 Post 请求参数
         ParseFromUrlencoded();
+        // 处理登录注册请求
         if (kDefaultHtmlTag_.count(url_)) {
             int tag = kDefaultHtmlTag_.at(url_);
             // LOG_DEBUG("Tag:%d", tag);
             if (tag == 0 || tag == 1) {
                 bool is_login = (tag == 1);
-                if (UserVerify(post_request_parms_["username"], post_request_parms_["password"],
-                               is_login)) {
+                if (UserVerify(post_request_parms_["username"],
+                               post_request_parms_["password"], is_login)) {
                     url_ = "/welcome.html";
                 } else {
                     url_ = "/error.html";
@@ -173,6 +197,16 @@ void HttpRequest::ParsePost() {
     }
 }
 
+// 将 16 进制数转为 10 进制数
+int HttpRequest::ConvertHexToDecimal(char ch) {
+    if (ch >= 'A' && ch <= 'F')
+        return ch - 'A' + 10;
+    if (ch >= 'a' && ch <= 'f')
+        return ch - 'a' + 10;
+    return ch;
+}
+
+// 从 ContentType = application/x-www-form-urlencoded 的请求体中解析请求参数
 void HttpRequest::ParseFromUrlencoded() {
     if (body_.empty()) {
         return;
@@ -194,7 +228,8 @@ void HttpRequest::ParseFromUrlencoded() {
                 body_[i] = ' ';
                 break;
             case '%':
-                num = ConverHex(body_[i + 1]) * 16 + ConverHex(body_[i + 1]);
+                num = ConvertHexToDecimal(body_[i + 1]) * 16 +
+                      ConvertHexToDecimal(body_[i + 2]);
                 body_[i + 2] = num % 10 + '0';
                 body_[i + 1] = num / 10 + '0';
                 i += 2;
@@ -209,14 +244,14 @@ void HttpRequest::ParseFromUrlencoded() {
                 break;
         }
     }
-    assert(j <= i);
+    // 获取最后一个请求参数
     if (post_request_parms_.count(key) == 0 && j < i) {
         value = body_.substr(j, i - j);
         post_request_parms_[key] = value;
     }
 }
 
-// 重点理解
+// 用户注册登录验证*****
 bool HttpRequest::UserVerify(const std::string& name,
                              const std::string& pwd,
                              bool is_login) {
@@ -256,7 +291,7 @@ bool HttpRequest::UserVerify(const std::string& name,
     while (MYSQL_ROW row = mysql_fetch_row(res)) {
         // LOG_DEBUG("MYSQL ROW: %s %s", row[0], row[1]);
         std::string password(row[1]);
-        
+
         // 登录 - 验证密码
         if (is_login) {
             if (pwd == password) {
@@ -265,7 +300,7 @@ bool HttpRequest::UserVerify(const std::string& name,
                 flag = false;
                 // LOG_DEBUG("pwd error!");
             }
-        } 
+        }
         // 注册 - 用户名已存在
         else {
             flag = false;
@@ -278,7 +313,9 @@ bool HttpRequest::UserVerify(const std::string& name,
     if (!is_login && flag == true) {
         // LOG_DEBUG("regirster!");
         memset(order, 0, sizeof(order));
-        snprintf(order, 256,"INSERT INTO user(username, password) VALUES('%s','%s')", name.c_str(), pwd.c_str());
+        snprintf(order, 256,
+                 "INSERT INTO user(username, password) VALUES('%s','%s')",
+                 name.c_str(), pwd.c_str());
         // LOG_DEBUG( "%s", order);
         if (mysql_query(sql, order) != 0) {
             // LOG_DEBUG( "Insert error!");

@@ -78,7 +78,7 @@ void Buffer::EnsureWritable(size_t len) {
 // 从 fd 中读取数据，写入到 Buffer 中
 ssize_t Buffer::ReadFd(int fd, int* save_errno) {
     // 分散读，保证读到不能再读
-    char buff[65535];
+    char buff[1024];
     iovec iov[2]{};
     const size_t writable_bytes = WritableBytes();
     iov[0].iov_base = Begin() + write_pos_;
@@ -90,7 +90,7 @@ ssize_t Buffer::ReadFd(int fd, int* save_errno) {
     if (len < 0) {
         *save_errno = errno;
     } else if (len <= writable_bytes) {
-        write_pos_ += len;
+        HasWritten(len);
     } else {
         write_pos_ = buffer_.size();
         Append(buff, len - writable_bytes);

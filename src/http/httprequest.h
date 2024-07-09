@@ -15,6 +15,7 @@
 
 class HttpRequest {
    public:
+    // 指示解析到请求报文的哪一部分的枚举（主状态机）
     enum class ParseState {
         START_LINE,
         HEADERS,
@@ -22,6 +23,7 @@ class HttpRequest {
         FINISH
     };
 
+    // 指示解析结果的枚举（从状态机）
     enum class HttpCode {
         NO_REQUEST,
         GET_REQUEST,
@@ -30,7 +32,7 @@ class HttpRequest {
         FORBIDDENT_REQUEST,
         FILE_REQUEST,
         INTERNAL_ERROR,
-        CLOSED_CONNECTION,
+        CLOSED_CONNECTION
     };
 
     HttpRequest();
@@ -42,20 +44,20 @@ class HttpRequest {
     std::string& url();
     std::string method() const;
     std::string version() const;
-    std::string GetPostRequestParm(const std::string& key) const;
-    std::string GetPostRequestParm(const char* key) const;
+    ParseState state() const;
     bool IsKeepAlive() const;
+    std::string GetPostRequestParm(const std::string& key) const;
 
-    bool Parse(Buffer& buff);
+    HttpCode Parse(Buffer& buff);
 
    private:
     bool ParseStartLine(const std::string& line);
-    void ParseHeaders(const std::string& line);
-    void ParseBody(const std::string& line);
+    bool ParseHeaders(const std::string& line);
+    bool ParseBody(const std::string& line);
 
     void ParseUrl();
     void ParsePost();
-    void ParseFromUrlencoded();  // ???
+    void ParseFromUrlencoded();
 
     static bool UserVerify(const std::string& name,
                            const std::string& pwd,
@@ -71,7 +73,7 @@ class HttpRequest {
 
     static const std::unordered_set<std::string> kDefaultHtml_;
     static const std::unordered_map<std::string, int> kDefaultHtmlTag_;
-    static int ConverHex(char ch);  // ???
+    static int ConvertHexToDecimal(char ch);  
 };
 
 #endif

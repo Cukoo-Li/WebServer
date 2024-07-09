@@ -10,7 +10,6 @@ WebServer::WebServer(Config config)
       kPort_(config.port),
       kEnableLinger_(config.enable_linger),
       kTimeout_(config.timeout) {
-
     HttpConn::kWorkDir_ = kWorkDir_;
     is_closed_ = false;
     timer_heap_.reset(new TimerHeap());
@@ -26,9 +25,10 @@ WebServer::WebServer(Config config)
     }
 
     // if (config.enable_log) {
-    //             Log::Instance()->init(config.log_level, "./log", ".log", config.log_que_size);
-    //     if(is_closed_) { LOG_ERROR("========== Server init error!==========");
-    //     } else {
+    //             Log::Instance()->init(config.log_level, "./log", ".log",
+    //             config.log_que_size);
+    //     if(is_closed_) { LOG_ERROR("========== Server init
+    //     error!=========="); } else {
     //         LOG_INFO("========== Server init ==========");
     //         LOG_INFO("Port:%d, OpenLinger: %s", kPort_, kEnableLinger_?
     //         "true":"false");
@@ -186,26 +186,41 @@ void WebServer::ResetTimer(HttpConn* client) {
     }
 }
 
+// 由线程负责执行
+// 从 connfd 中读数据
 void WebServer::OnRead(HttpConn* client) {
     assert(client);
     int ret = -1;
     int read_errno = 0;
     ret = client->Read(&read_errno);
-    if (ret < 0 && read_errno != EAGAIN) {
+    // 发生错误
+    if (ret == -1 && read_errno != EAGAIN) {
         CloseConn(client);
         return;
     }
+    // 对方已关闭连接
+    if (ret == 0) {
+        CloseConn(client);
+        return;
+    }
+    // 处理（解析）所读到的数据
     OnProcess(client);
 }
 
+// 由线程负责执行
+// 处理其实包含两个部分工作：解析请求报文、生成响应报文内容
 void WebServer::OnProcess(HttpConn* client) {
     if (client->Process()) {
+        // 处理完成，响应报文准备完毕，接下来就只要准备写了
         epoller_->Modify(client->sockfd(), connfd_event_ | EPOLLOUT);
     } else {
+        // 未处理完成，说明请求报文不完整，接下来还得继续读
         epoller_->Modify(client->sockfd(), connfd_event_ | EPOLLIN);
     }
 }
 
+// 由线程负责执行
+// 往 connfd 中写数据
 void WebServer::OnWrite(HttpConn* client) {
     assert(client);
     int ret = -1;
@@ -214,6 +229,7 @@ void WebServer::OnWrite(HttpConn* client) {
     if (client->ToWriteBytes() == 0 && client->IsKeepAlive()) {
         // 传输完成，但需要保持连接
         OnProcess(client);  // 实际上只是清空了 HttpRequst 对象
+        // 直接写 request_.Init(); 加上注册读事件 行不行?
         return;
     }
     if (ret == -1 && write_errno == EAGAIN) {
@@ -221,5 +237,6 @@ void WebServer::OnWrite(HttpConn* client) {
         epoller_->Modify(client->sockfd(), connfd_event_ || EPOLLOUT);
         return;
     }
+    // 非预期情况，关闭连接
     CloseConn(client);
 }
