@@ -1,6 +1,6 @@
 #include "httpconn.h"
 
-const char* HttpConn::kWorkDir_ = nullptr;
+std::string HttpConn::kWorkDir_;
 std::atomic<int> HttpConn::client_count_{};
 
 HttpConn::HttpConn() {

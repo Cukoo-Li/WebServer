@@ -10,6 +10,8 @@ WebServer::WebServer(Config config)
       kPort_(config.port),
       kEnableLinger_(config.enable_linger),
       kTimeout_(config.timeout) {
+
+    HttpConn::kWorkDir_ = kWorkDir_;
     is_closed_ = false;
     timer_heap_.reset(new TimerHeap());
     thread_pool_.reset(new ThreadPool(config.thread_pool_size));
@@ -24,18 +26,12 @@ WebServer::WebServer(Config config)
     }
 
     // if (config.enable_log) {
-    //             Log::Instance()->init(logLevel, "./log", ".log", logQueSize);
-    //     if(isClose_) { LOG_ERROR("========== Server init error!==========");
+    //             Log::Instance()->init(config.log_level, "./log", ".log", config.log_que_size);
+    //     if(is_closed_) { LOG_ERROR("========== Server init error!==========");
     //     } else {
     //         LOG_INFO("========== Server init ==========");
-    //         LOG_INFO("Port:%d, OpenLinger: %s", port_, OptLinger?
-    //         "true":"false"); LOG_INFO("Listen Mode: %s, OpenConn Mode: %s",
-    //                         (listenEvent_ & EPOLLET ? "ET": "LT"),
-    //                         (connEvent_ & EPOLLET ? "ET": "LT"));
-    //         LOG_INFO("LogSys level: %d", logLevel);
-    //         LOG_INFO("srcDir: %s", HttpConn::srcDir);
-    //         LOG_INFO("SqlConnPool num: %d, ThreadPool num: %d", connPoolNum,
-    //         threadNum);
+    //         LOG_INFO("Port:%d, OpenLinger: %s", kPort_, kEnableLinger_?
+    //         "true":"false");
     //     }
     // }
 }

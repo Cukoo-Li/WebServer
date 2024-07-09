@@ -1,15 +1,19 @@
 #include "timerheap.h"
 
+// 构造函数中预申请一些空间
 TimerHeap::TimerHeap() {
     heap_.reserve(64);
 }
 
+// 其实没必要显式清空，成员变量自然会被销毁
 TimerHeap::~TimerHeap() {
     Clear();
 }
 
-void TimerHeap::SiftUp(int i) {
-    assert(i < heap_.size());
+// 向上调整
+void TimerHeap::SiftUp(int idx) {
+    assert(idx < heap_.size());
+    int i = idx;
     int j = (i - 1) / 2;
     while (j >= 0) {
         if (heap_[j] <= heap_[i]) {
@@ -21,22 +25,14 @@ void TimerHeap::SiftUp(int i) {
     }
 }
 
-void TimerHeap::SwapNode(int i, int j) {
-    assert(i < heap_.size());
-    assert(j < heap_.size());
-    std::swap(heap_[i], heap_[j]);
-    ref_[heap_[i].id] = i;
-    ref_[heap_[j].id] = j;
-}
-
-// 以 index 为根的堆仅在根结点位置不满足小根堆性质，需要调整（根结点不断下坠）
-bool TimerHeap::SiftDown(int index, int n) {
-    assert(index < heap_.size());
-    assert(n <= heap_.size());
-    int i = index;
+// 向下调整（仅在 i 处不满足堆性质）
+bool TimerHeap::SiftDown(int idx, int last) {
+    assert(idx < heap_.size());
+    assert(last <= heap_.size());
+    int i = idx;
     int j = i * 2 + 1;
-    while (j < n) {
-        if (j + 1 < n && heap_[j + 1] < heap_[j]) {
+    while (j < last) {
+        if (j + 1 < last && heap_[j + 1] < heap_[j]) {
             ++j;
         }
         if (heap_[i] <= heap_[j]) {
@@ -46,9 +42,19 @@ bool TimerHeap::SiftDown(int index, int n) {
         i = j;
         j = i * 2 + 1;
     }
-    return i > index;
+    return j > idx;
 }
 
+// 交换两个结点的位置
+void TimerHeap::SwapNode(int i, int j) {
+    assert(i < heap_.size());
+    assert(j < heap_.size());
+    std::swap(heap_[i], heap_[j]);
+    ref_[heap_[i].id] = i;
+    ref_[heap_[j].id] = j;
+}
+
+// 添加结点
 void TimerHeap::Add(int id, int timeout, const TimeoutCallBack& cb) {
     assert(id >= 0);
     int i;
@@ -69,6 +75,7 @@ void TimerHeap::Add(int id, int timeout, const TimeoutCallBack& cb) {
     }
 }
 
+// 触发指定的定时器
 void TimerHeap::DoWork(int id) {
     if (heap_.empty() || ref_.count(id) == 0) {
         return;
@@ -79,10 +86,11 @@ void TimerHeap::DoWork(int id) {
     Remove(i);
 }
 
-void TimerHeap::Remove(int index){
-    assert(!heap_.empty() && index < heap_.size());
+// 删除结点
+void TimerHeap::Remove(int idx){
+    assert(!heap_.empty() && idx < heap_.size());
     // 将要删除的结点换到堆尾，然后调整堆
-    int i = index;
+    int i = idx;
     int n = heap_.size() - 1;
     assert(i <= n);
     if (i < n) {
@@ -96,19 +104,15 @@ void TimerHeap::Remove(int index){
     heap_.pop_back();
 }
 
-// 更新指定结点的超时时间
+// 更新指定结点的超时时间（只考虑超时时间延长的情形）
 void TimerHeap::Adjust(int id, int timeout) {
-    // 调整指定 id 的结点
     assert(!heap_.empty() && ref_.count(id) > 0);
     heap_[ref_[id]].expires = Clock::now() + MS(timeout);
     SiftDown(ref_[id], heap_.size());
 }
 
+// 处理当前所有超时的结点
 void TimerHeap::Tick() {
-    // 处理超时的结点
-    if (heap_.empty()) {
-        return;
-    }
     while (!heap_.empty()) {
         Timer timer = heap_.front();
         if (std::chrono::duration_cast<MS>(timer.expires - Clock::now()).count() > 0) {
@@ -119,11 +123,13 @@ void TimerHeap::Tick() {
     }
 }
 
+// 弹出堆顶结点
 void TimerHeap::Pop() {
     assert(!heap_.empty());
     Remove(0);
 }
 
+// 删除所有结点
 void TimerHeap::Clear() {
     ref_.clear();
     heap_.clear();

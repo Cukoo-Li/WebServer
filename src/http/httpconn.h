@@ -42,7 +42,7 @@ class HttpConn {
 
     bool IsKeepAlive() const;
 
-    static const char* kWorkDir_;
+    static std::string kWorkDir_;
     static std::atomic<int> client_count_;
 
    private:

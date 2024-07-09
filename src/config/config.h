@@ -13,9 +13,9 @@ struct Config {
     const char* db_name = "webserver";
     int sql_conn_pool_size = 8;
     int thread_pool_size = 8;
-    // bool enable_log;
-    // int log_level;
-    // int log_que_size;
+    bool enable_log = true;
+    int log_level = 1;
+    int log_que_size = 1024;
 };
 
 #endif
