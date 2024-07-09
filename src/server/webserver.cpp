@@ -55,6 +55,7 @@ void WebServer::Startup() {
             // 处理新客户的连接请求
             if (fd == listenfd_) {
                 HandleListenFdEvent();
+                std::cout << "有新连接" << std::endl;
             }
             // 处理 connfd 上的错误
             else if (events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
@@ -136,6 +137,7 @@ void WebServer::CloseConn(HttpConn* client) {
     // LOG_INFO("Client[%d] quit!", client->sockfd());
     epoller_->Remove(client->sockfd());
     client->Close();
+    std::cout << "连接已关闭" << std::endl;
 }
 
 void WebServer::HandleListenFdEvent() {
@@ -229,7 +231,6 @@ void WebServer::OnWrite(HttpConn* client) {
     if (client->ToWriteBytes() == 0 && client->IsKeepAlive()) {
         // 传输完成，但需要保持连接
         OnProcess(client);  // 实际上只是清空了 HttpRequst 对象
-        // 直接写 request_.Init(); 加上注册读事件 行不行?
         return;
     }
     if (ret == -1 && write_errno == EAGAIN) {
