@@ -36,7 +36,7 @@ bool TimerHeap::SiftDown(int index, int n) {
     int i = index;
     int j = i * 2 + 1;
     while (j < n) {
-        if (j + 1 < n && heap_[j + 1] <= heap_[j]) {
+        if (j + 1 < n && heap_[j + 1] < heap_[j]) {
             ++j;
         }
         if (heap_[i] <= heap_[j]) {
