@@ -1,15 +1,16 @@
 #include "timerheap.h"
 
 TimerHeap::TimerHeap() {
+    heap_.reserve(64);
 }
 
 TimerHeap::~TimerHeap() {
     Clear();
 }
 
-void TimerHeap::SiftUp(size_t i) {
+void TimerHeap::SiftUp(int i) {
     assert(i < heap_.size());
-    int j = (static_cast<int>(i) - 1) / 2;
+    int j = (i - 1) / 2;
     while (j >= 0) {
         if (heap_[j] <= heap_[i]) {
             break;
@@ -20,7 +21,7 @@ void TimerHeap::SiftUp(size_t i) {
     }
 }
 
-void TimerHeap::SwapNode(size_t i, size_t j) {
+void TimerHeap::SwapNode(int i, int j) {
     assert(i < heap_.size());
     assert(j < heap_.size());
     std::swap(heap_[i], heap_[j]);
@@ -29,11 +30,11 @@ void TimerHeap::SwapNode(size_t i, size_t j) {
 }
 
 // 以 index 为根的堆仅在根结点位置不满足小根堆性质，需要调整（根结点不断下坠）
-bool TimerHeap::SiftDown(size_t index, size_t n) {
+bool TimerHeap::SiftDown(int index, int n) {
     assert(index < heap_.size());
     assert(n <= heap_.size());
-    size_t i = index;
-    size_t j = i * 2 + 1;
+    int i = index;
+    int j = i * 2 + 1;
     while (j < n) {
         if (j + 1 < n && heap_[j + 1] <= heap_[j]) {
             ++j;
@@ -50,7 +51,7 @@ bool TimerHeap::SiftDown(size_t index, size_t n) {
 
 void TimerHeap::Add(int id, int timeout, const TimeoutCallBack& cb) {
     assert(id >= 0);
-    size_t i;
+    int i;
     if (ref_.count(id) == 0) {
         // 新结点：堆尾插入，调整堆
         i = heap_.size();
@@ -72,17 +73,17 @@ void TimerHeap::DoWork(int id) {
     if (heap_.empty() || ref_.count(id) == 0) {
         return;
     }
-    size_t i = ref_[id];
+    int i = ref_[id];
     Timer timer = heap_[i];
     timer.cb();
     Remove(i);
 }
 
-void TimerHeap::Remove(size_t index){
+void TimerHeap::Remove(int index){
     assert(!heap_.empty() && index < heap_.size());
     // 将要删除的结点换到堆尾，然后调整堆
-    size_t i = index;
-    size_t n = heap_.size() - 1;
+    int i = index;
+    int n = heap_.size() - 1;
     assert(i <= n);
     if (i < n) {
         SwapNode(i, n);
@@ -128,6 +129,7 @@ void TimerHeap::Clear() {
     heap_.clear();
 }
 
+// 处理超时结点，并返回新堆顶结点的剩余超时时间（毫秒）
 int TimerHeap::GetNextTick() {
     Tick();
     int res = -1;
