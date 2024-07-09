@@ -32,19 +32,19 @@ class TimerHeap {
     void Adjust(int id, int new_expires);
     void Add(int id, int time_out, const TimeoutCallBack& cb);
     void DoWork(int id);
-    void Clear();       // ???
-    void Tick();        // ???
-    void Pop();         // ???
-    int GetNextTick();  // ???
+    void Clear(); 
+    void Tick();
+    void Pop();
+    int GetNextTick();
 
    private:
-    void Remove(size_t i);              // ???
-    void SiftUp(size_t i);              // ???
-    bool SiftDown(size_t i, size_t n);  // ???
-    void SwapNode(size_t i, size_t j);  // ???
+    void Remove(int i);
+    void SiftUp(int i);  
+    bool SiftDown(int i, int n); 
+    void SwapNode(int i, int j); 
 
     std::vector<Timer> heap_;
-    std::unordered_map<int, size_t> ref_;  // ???
+    std::unordered_map<int, int> ref_;  // fd -> idx
 };
 
 #endif
