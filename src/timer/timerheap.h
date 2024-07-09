@@ -22,6 +22,7 @@ struct Timer {
     TimeStamp expires;
     TimeoutCallBack cb;
     bool operator<=(const Timer& that) { return expires <= that.expires; }
+    bool operator<(const Timer& that) { return expires < that.expires; }
 };
 
 class TimerHeap {
