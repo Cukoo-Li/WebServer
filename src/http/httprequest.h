@@ -7,7 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include "../buffer/buffer.h"
 #include "../pool/sqlconnguard.h"

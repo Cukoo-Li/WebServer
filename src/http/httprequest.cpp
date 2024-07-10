@@ -169,13 +169,13 @@ bool HttpRequest::ParseBody(const std::string& line) {
     body_ = line;
     ParsePost();
     state_ = ParseState::FINISH;
-    spdlog::debug("Body:{}, len:{}", line, line.size());
+    spdlog::info("Body:{}, len:{}", line, line.size());
     return true;
 }
 
 // 解析 Post 请求
 void HttpRequest::ParsePost() {
-    if (method_ == "Post" &&
+    if (method_ == "POST" &&
         headers_["Content-Type"] == "application/x-www-form-urlencoded") {
         // 将请求体解析成 Post 请求参数
         ParseFromUrlencoded();
@@ -310,12 +310,12 @@ bool HttpRequest::UserVerify(const std::string& name,
 
     // 注册行为 且 用户名未被使用
     if (!is_login && flag == true) {
-        spdlog::debug("regirster!");
+        spdlog::info("regirster!");
         memset(order, 0, sizeof(order));
         snprintf(order, 256,
                  "INSERT INTO user(username, password) VALUES('%s','%s')",
                  name.c_str(), pwd.c_str());
-        spdlog::debug("{}", order);
+        spdlog::info("{}", order);
         if (mysql_query(sql, order) != 0) {
             spdlog::debug("Insert error!");
             flag = false;
