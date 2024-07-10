@@ -9,8 +9,8 @@
 #include <functional>
 #include <queue>
 #include <unordered_map>
+#include "spdlog/spdlog.h"
 
-#include "../log/log.h"
 
 using TimeoutCallBack = std::function<void()>;
 using Clock = std::chrono::high_resolution_clock;

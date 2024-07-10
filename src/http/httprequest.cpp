@@ -115,8 +115,7 @@ HttpRequest::HttpCode HttpRequest::Parse(Buffer& buff) {
         }
         buff.RetrieveUntil(line_end + 2);
     }
-    // LOG_DEBUG("[%s], [%s], [%s]", method_.c_str(), url_.c_str(),
-    // version_.c_str());
+    spdlog::debug("[{}], [{}], [{}]", method_, url_, version_);
     return HttpCode::NO_REQUEST;
 }
 
@@ -143,7 +142,7 @@ bool HttpRequest::ParseStartLine(const std::string& line) {
         state_ = ParseState::HEADERS;  // 切换状态
         return true;
     }
-    // LOG_ERROR("StartLine Error! %s", line.c_str());
+    spdlog::error("StartLine Error! {}", line);
     return false;
 }
 
@@ -156,7 +155,7 @@ bool HttpRequest::ParseHeaders(const std::string& line) {
     } else if (line == "") {
         state_ = ParseState::BODY;
     } else {
-        // LOG_ERROR("Headers Error! %s", line.c_str());
+        spdlog::error("Headers Error! {}", line);
         return false;
     }
     return true;
@@ -170,7 +169,7 @@ bool HttpRequest::ParseBody(const std::string& line) {
     body_ = line;
     ParsePost();
     state_ = ParseState::FINISH;
-    // LOG_DEBUG("Body:%s, len:%d", line.c_str(), line.size());
+    spdlog::debug("Body:{}, len:{}", line, line.size());
     return true;
 }
 
@@ -183,7 +182,7 @@ void HttpRequest::ParsePost() {
         // 处理登录注册请求
         if (kDefaultHtmlTag_.count(url_)) {
             int tag = kDefaultHtmlTag_.at(url_);
-            // LOG_DEBUG("Tag:%d", tag);
+            spdlog::debug("Tag:{}", tag);
             if (tag == 0 || tag == 1) {
                 bool is_login = (tag == 1);
                 if (UserVerify(post_request_parms_["username"],
@@ -238,7 +237,7 @@ void HttpRequest::ParseFromUrlencoded() {
                 value = body_.substr(j, i - j);
                 j = i + 1;
                 post_request_parms_[key] = value;
-                // LOG_DEBUG("%s = %s", key.c_str(), value.c_str());
+                spdlog::debug("{} = {}", key, value);
                 break;
             default:
                 break;
@@ -258,7 +257,7 @@ bool HttpRequest::UserVerify(const std::string& name,
     if (name == "" || pwd == "") {
         return false;
     }
-    // LOG_INFO("Verify name:%s pwd:%s", name.c_str(), pwd.c_str());
+    spdlog::info("Verify name:{} pwd:{}", name, pwd);
     MYSQL* sql;
     SqlConnGuard give_me_a_name(&sql, SqlConnPool::Instance());
     assert(sql);
@@ -276,7 +275,7 @@ bool HttpRequest::UserVerify(const std::string& name,
     snprintf(order, 256,
              "SELECT username, password FROM user WHERE username='%s' LIMIT 1",
              name.c_str());
-    // LOG_DEBUG("%s", order);
+    spdlog::debug("{}", order);
 
     if (mysql_query(sql, order) != 0) {
         mysql_free_result(res);
@@ -289,7 +288,7 @@ bool HttpRequest::UserVerify(const std::string& name,
 
     // 为什么要用 while？不就一行记录吗？
     while (MYSQL_ROW row = mysql_fetch_row(res)) {
-        // LOG_DEBUG("MYSQL ROW: %s %s", row[0], row[1]);
+        spdlog::debug("MYSQL ROW: {} {}", row[0], row[1]);
         std::string password(row[1]);
 
         // 登录 - 验证密码
@@ -298,31 +297,31 @@ bool HttpRequest::UserVerify(const std::string& name,
                 flag = true;
             } else {
                 flag = false;
-                // LOG_DEBUG("pwd error!");
+                spdlog::debug("pwd error!");
             }
         }
         // 注册 - 用户名已存在
         else {
             flag = false;
-            // LOG_DEBUG("user used!");
+            spdlog::debug("user used!");
         }
     }
     mysql_free_result(res);
 
     // 注册行为 且 用户名未被使用
     if (!is_login && flag == true) {
-        // LOG_DEBUG("regirster!");
+        spdlog::debug("regirster!");
         memset(order, 0, sizeof(order));
         snprintf(order, 256,
                  "INSERT INTO user(username, password) VALUES('%s','%s')",
                  name.c_str(), pwd.c_str());
-        // LOG_DEBUG( "%s", order);
+        spdlog::debug("{}", order);
         if (mysql_query(sql, order) != 0) {
-            // LOG_DEBUG( "Insert error!");
+            spdlog::debug("Insert error!");
             flag = false;
         }
         flag = true;
     }
-    // LOG_DEBUG( "UserVerify success!!");
+    spdlog::debug("UserVerify success!!");
     return flag;
 }

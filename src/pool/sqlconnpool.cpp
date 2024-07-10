@@ -18,12 +18,12 @@ void SqlConnPool::Init(const char* host,
         MYSQL* sql = nullptr;
         sql = mysql_init(sql);
         if (!sql) {
-            // LOG_ERROR("MySQL init error!");
+            spdlog::error("MySQL init error!");
         }
         assert(sql);
         sql = mysql_real_connect(sql, host, user, pwd, db_name, port, nullptr, 0);
         if (!sql) {
-            // LOG_ERROR("MySQL connect error!");
+            spdlog::error("MySQL connect error!");
         }
         assert(sql);
         conns_que_.push(sql);

@@ -7,10 +7,10 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <atomic>
+#include "spdlog/spdlog.h"
 
 #include "httprequest.h"
 #include "httpresponse.h"
-#include "../log/log.h"
 #include "../pool/sqlconnguard.h"
 #include "../buffer/buffer.h"
 

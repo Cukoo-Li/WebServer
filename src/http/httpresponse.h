@@ -6,9 +6,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <unordered_map>
+#include "spdlog/spdlog.h"
 
 #include "../buffer/buffer.h"
-#include "../log/log.h"
 
 class HttpResponse {
    public:

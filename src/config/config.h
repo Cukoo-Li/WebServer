@@ -1,8 +1,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <string>
+
 struct Config {
-    const char* work_dir = "/home/cukoo/文档/GitHub-Repositories/WebServer-Modern-Cpp/resources";
+    std::string work_dir = "/home/cukoo/文档/GitHub-Repositories/WebServer-Modern-Cpp/resources";
     int port = 1027;
     bool enable_linger = true;
     int timeout = 10000;    // 客户连接超时时间
@@ -13,9 +15,6 @@ struct Config {
     const char* db_name = "webserver";
     int sql_conn_pool_size = 8;
     int thread_pool_size = 8;
-    bool enable_log = true;
-    int log_level = 1;
-    int log_que_size = 1024;
 };
 
 #endif

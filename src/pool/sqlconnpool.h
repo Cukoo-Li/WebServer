@@ -7,7 +7,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
-#include "../log/log.h"
+#include "spdlog/spdlog.h"
 
 class SqlConnPool {
     public:

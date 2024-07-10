@@ -27,10 +27,10 @@ WebServer::WebServer(Config config)
     // if (config.enable_log) {
     //             Log::Instance()->init(config.log_level, "./log", ".log",
     //             config.log_que_size);
-    //     if(is_closed_) { LOG_ERROR("========== Server init
+    //     if(is_closed_) { spdlog::error("========== Server init
     //     error!=========="); } else {
-    //         LOG_INFO("========== Server init ==========");
-    //         LOG_INFO("Port:%d, OpenLinger: %s", kPort_, kEnableLinger_?
+    //         spdlog::info("========== Server init ==========");
+    //         spdlog::info("Port:%d, OpenLinger: %s", kPort_, kEnableLinger_?
     //         "true":"false");
     //     }
     // }
@@ -75,7 +75,7 @@ void WebServer::Startup() {
             }
             // 未定义事件
             else {
-                // LOG_ERROR("Unexpected event");
+                spdlog::error("Unexpected event");
             }
         }
     }
@@ -119,7 +119,7 @@ bool WebServer::InitListenSocket() {
     assert(ret == 1);
 
     SetFdNonblock(listenfd_);
-    // LOG_INFO("Server port:%d", port_);
+    spdlog::info("Server port:{}", kPort_);
     return true;
 }
 
@@ -134,7 +134,7 @@ void WebServer::SendError(int fd, const char* message) {
 
 void WebServer::CloseConn(HttpConn* client) {
     assert(client);
-    // LOG_INFO("Client[%d] quit!", client->sockfd());
+    spdlog::info("Client[{}] quit!", client->sockfd());
     epoller_->Remove(client->sockfd());
     client->Close();
     std::cout << "连接已关闭" << std::endl;
@@ -165,7 +165,7 @@ void WebServer::HandleListenFdEvent() {
         // 注册事件
         epoller_->Add(fd, EPOLLIN | connfd_event_);
         SetFdNonblock(fd);
-        // LOG_INFO("Client[%d] in!", clients_[fd].sockfd());
+        spdlog::info("Client[{}] in!", clients_[fd].sockfd());
     }
 }
 
