@@ -23,7 +23,7 @@ void HttpConn::Init(int sockfd, const sockaddr_in& addr) {
     write_buff_.RetrieveAll();
     read_buff_.RetrieveAll();
     is_closed_ = false;
-    spdlog::info("Client[{}]({}:{}) in, userCount:{}", sockfd_, ip(), port(), client_count_);
+    spdlog::info("Client[{}]({}:{}) enter. \t[client count:{}]", sockfd_, ip(), port(), client_count_);
 }
 
 void HttpConn::Close() {
@@ -33,7 +33,7 @@ void HttpConn::Close() {
     is_closed_ = true;
     --client_count_;
     close(sockfd_);
-    spdlog::info("Client[{}]({}:{}) quit, UserCount:{}", sockfd_, ip(), port(), client_count_);
+    spdlog::info("Client[{}]({}:{}) quit. \t[client count:{}]", sockfd_, ip(), port(), client_count_);
 }
 
 int HttpConn::sockfd() const {
@@ -112,7 +112,7 @@ bool HttpConn::Process() {
     HttpRequest::HttpCode http_code = request_.Parse(read_buff_);
     // 已接收到完整的请求报文
     if (http_code == HttpRequest::HttpCode::GET_REQUEST) {
-        spdlog::info("{}", request_.url());
+        spdlog::debug("Client[{}]({}:{})  request url: {}", sockfd_, ip(), port(), request_.url());
         response_.Init(kWorkDir_, request_.url(), request_.IsKeepAlive(), 200);
     }
     // 请求报文不完整
@@ -136,7 +136,7 @@ bool HttpConn::Process() {
         iov_[1].iov_len = response_.file_size();
         iov_cnt_ = 2;
     }
-    spdlog::debug("filesize:{}, {} to {}", response_.file_size(), iov_cnt_, ToWriteBytes());
+    spdlog::debug("Client[{}]({}:{})  filesize: {}, iov_cnt: {},  ToWriteBytes: {}", sockfd_, ip(), port(),response_.file_size(), iov_cnt_, ToWriteBytes());
     return true;
 }
 
