@@ -44,7 +44,7 @@ class TimerHeap {
     void SwapNode(int i, int j);
 
     std::vector<Timer> heap_;           // 小根堆
-    std::unordered_map<int, int> ref_;  // fd / id -> idx
+    std::unordered_map<int, int> ref_;  // id -> idx
 };
 
 #endif
