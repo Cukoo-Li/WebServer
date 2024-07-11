@@ -23,7 +23,7 @@ void HttpConn::Init(int sockfd, const sockaddr_in& addr) {
     write_buff_.RetrieveAll();
     read_buff_.RetrieveAll();
     is_closed_ = false;
-    spdlog::info("Client[{}]({}:{}) enter. \t[client count:{}]", sockfd_, ip(), port(), client_count_);
+    spdlog::info("Client[{}]({}:{}) init. \t[client count:{}]", sockfd_, ip(), port(), client_count_);
 }
 
 void HttpConn::Close() {
