@@ -50,14 +50,14 @@ HttpResponse::~HttpResponse() {
 }
 
 void HttpResponse::Init(const std::string& work_dir,
-                        std::string& path,
+                        std::string& file_path,
                         bool is_keep_alive,
                         int code) {
     assert(work_dir != "");
     UnmapFile();
     code_ = code;
     is_keep_alive_ = is_keep_alive;
-    file_path_ = path;
+    file_path_ = file_path;
     work_dir_ = work_dir;
     file_addr_ = nullptr;
     file_stat_ = {};
