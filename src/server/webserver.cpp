@@ -45,7 +45,7 @@ void WebServer::Startup() {
     int timeout = -1;
     while (!is_closed_) {
         if (kTimeout_ > 0) {
-            timeout = timer_heap_->GetNextTick();
+            timeout = timer_heap_->Tick();
         }
         int event_cnt = epoller_->Wait(timeout);
         for (int i = 0; i < event_cnt; ++i) {
@@ -119,7 +119,7 @@ bool WebServer::InitListenSocket() {
     assert(ret == 1);
 
     SetFdNonblock(listenfd_);
-    spdlog::info("Server port:{}", kPort_);
+    spdlog::info("Server port: {}", kPort_);
     return true;
 }
 
@@ -134,10 +134,9 @@ void WebServer::SendError(int fd, const char* message) {
 
 void WebServer::CloseConn(HttpConn* client) {
     assert(client);
-    spdlog::info("Client[{}] quit!", client->sockfd());
     epoller_->Remove(client->sockfd());
     client->Close();
-    std::cout << "连接已关闭" << std::endl;
+    spdlog::info("Client[{}]({}:{}) quit. \t[client count:{}]", clients_[fd].sockfd(), clients_[fd].ip(), clients_[fd].port(), HttpConn::client_count_);
 }
 
 void WebServer::HandleListenFdEvent() {
@@ -165,7 +164,7 @@ void WebServer::HandleListenFdEvent() {
         // 注册事件
         epoller_->Add(fd, EPOLLIN | connfd_event_);
         SetFdNonblock(fd);
-        spdlog::info("Client[{}] in!", clients_[fd].sockfd());
+        spdlog::info("Client[{}]({}:{}) enter. \t[client count:{}]", clients_[fd].sockfd(), clients_[fd].ip(), clients_[fd].port(), HttpConn::client_count_);
     }
 }
 
