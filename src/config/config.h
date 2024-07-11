@@ -15,9 +15,9 @@ struct Config {
     const char* sql_user = "root";
     const char* sql_pwd = "768787";
     const char* db_name = "webserver";
-    int sql_conn_pool_size = 8;
-    int thread_pool_size = 8;
-    spdlog::level::level_enum log_level = spdlog::level::info;
+    int sql_conn_pool_size = 4;
+    int thread_pool_size = 4;
+    spdlog::level::level_enum log_level = spdlog::level::off;
 };
 
 #endif

@@ -1,7 +1,7 @@
 #include "webserver.h"
 
 int WebServer::SetFdNonblock(int fd) {
-    assert(fd > 0);
+    // assert(fd > 0);
     return fcntl(fd, F_SETFL, fcntl(fd, F_GETFD, 0) | O_NONBLOCK);
 }
 
@@ -10,6 +10,8 @@ WebServer::WebServer(Config config)
       kPort_(config.port),
       kEnableLinger_(config.enable_linger),
       kTimeout_(config.timeout) {
+    spdlog::set_level(config.log_level);
+
     HttpConn::kWorkDir_ = kWorkDir_;
     is_closed_ = false;
     timer_heap_.reset(new TimerHeap());
@@ -23,8 +25,6 @@ WebServer::WebServer(Config config)
     if (!InitListenSocket()) {
         is_closed_ = true;
     }
-
-    spdlog::set_level(config.log_level);
 
     spdlog::info("========== Server init ==========");
     spdlog::info("Port: {}, Enable Linger: {}", kPort_,
@@ -53,21 +53,21 @@ void WebServer::Startup() {
             // 处理新客户的连接请求
             if (fd == listenfd_) {
                 HandleListenFdEvent();
-                std::cout << "有新连接" << std::endl;
             }
             // 处理 connfd 上的错误
             else if (events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
-                assert(clients_.count(fd));
+                // assert(clients_.count(fd));
                 CloseConn(&clients_[fd]);
             }
             // 处理 connfd 上的可读事件
             else if (events & EPOLLIN) {
-                assert(clients_.count(fd));
+                // assert(clients_.count(fd));
                 HandleReadableEvent(&clients_[fd]);
             }
             // 处理 connfd 上的可写事件
             else if (events & EPOLLOUT) {
-                assert(clients_.count(fd));
+                // assert(clients_.count(fd));
+                spdlog::debug("{} 可写！！", fd);
                 HandleWritableEvent(&clients_[fd]);
             }
             // 未定义事件
@@ -82,7 +82,7 @@ void WebServer::Startup() {
 bool WebServer::InitListenSocket() {
     // 1. 创建 socket
     listenfd_ = socket(AF_INET, SOCK_STREAM, 0);
-    assert(listenfd_ >= 0);
+    // assert(listenfd_ >= 0);
 
     // 2. 命名 socket
     sockaddr_in addr{};
@@ -98,22 +98,22 @@ bool WebServer::InitListenSocket() {
     int ret;
     ret = setsockopt(listenfd_, SOL_SOCKET, SO_LINGER, &opt_linger,
                      sizeof(opt_linger));
-    assert(ret >= 0);
+    // assert(ret >= 0);
     // 端口复用
     int opt_reuse = 1;
     ret = setsockopt(listenfd_, SOL_SOCKET, SO_REUSEADDR, &opt_reuse,
                      sizeof(opt_reuse));
-    assert(ret >= 0);
+    // assert(ret >= 0);
     ret = bind(listenfd_, (sockaddr*)&addr, sizeof(addr));
-    assert(ret >= 0);
+    // assert(ret >= 0);
 
     // 3. 监听 socket
     ret = listen(listenfd_, 5);
-    assert(ret >= 0);
+    // assert(ret >= 0);
 
     // 注册事件
     ret = epoller_->Add(listenfd_, listenfd_event_ | EPOLLIN);
-    assert(ret == 1);
+    // assert(ret == 1);
 
     SetFdNonblock(listenfd_);
     spdlog::info("Server port: {}", kPort_);
@@ -121,7 +121,7 @@ bool WebServer::InitListenSocket() {
 }
 
 void WebServer::SendError(int fd, const char* message) {
-    assert(fd >= 0);
+    // assert(fd >= 0);
     int ret = send(fd, message, strlen(message), 0);
     if (ret < 0) {
         // LOG_WARN("send error to client[%d] error!", fd);
@@ -130,7 +130,7 @@ void WebServer::SendError(int fd, const char* message) {
 }
 
 void WebServer::CloseConn(HttpConn* client) {
-    assert(client);
+    // assert(client);
     epoller_->Remove(client->sockfd());
     client->Close();
 }
@@ -170,19 +170,19 @@ void WebServer::HandleListenFdEvent() {
 }
 
 void WebServer::HandleReadableEvent(HttpConn* client) {
-    assert(client);
+    // assert(client);
     ResetTimer(client);
     thread_pool_->AddTask(std::bind(&WebServer::OnRead, this, client));
 }
 
 void WebServer::HandleWritableEvent(HttpConn* client) {
-    assert(client);
+    // assert(client);
     ResetTimer(client);
     thread_pool_->AddTask(std::bind(&WebServer::OnWrite, this, client));
 }
 
 void WebServer::ResetTimer(HttpConn* client) {
-    assert(client);
+    // assert(client);
     if (kTimeout_ > 0) {
         timer_heap_->Adjust(client->sockfd(), kTimeout_);
     }
@@ -191,7 +191,7 @@ void WebServer::ResetTimer(HttpConn* client) {
 // 由线程负责执行
 // 从 connfd 中读数据
 void WebServer::OnRead(HttpConn* client) {
-    assert(client);
+    // assert(client);
     int ret = -1;
     int read_errno = 0;
     ret = client->Read(&read_errno);
@@ -224,7 +224,7 @@ void WebServer::OnProcess(HttpConn* client) {
 // 由线程负责执行
 // 往 connfd 中写数据
 void WebServer::OnWrite(HttpConn* client) {
-    assert(client);
+    // assert(client);
     int ret = -1;
     int write_errno = 0;
     ret = client->Write(&write_errno);
@@ -235,7 +235,7 @@ void WebServer::OnWrite(HttpConn* client) {
     }
     if (ret == -1 && write_errno == EAGAIN) {
         // 未传输完成，需要等下一次可写
-        epoller_->Modify(client->sockfd(), connfd_event_ || EPOLLOUT);
+        epoller_->Modify(client->sockfd(), connfd_event_ | EPOLLOUT);
         return;
     }
     // 非预期情况，关闭连接

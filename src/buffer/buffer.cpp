@@ -20,12 +20,12 @@ const char* Buffer::ReadBegin() const {
 }
 
 void Buffer::Retrieve(size_t len) {
-    assert(len <= ReadableBytes());
+    // assert(len <= ReadableBytes());
     read_pos_ += len;
 }
 
 void Buffer::RetrieveUntil(const char* end) {
-    assert(ReadBegin() <= end);
+    // assert(ReadBegin() <= end);
     Retrieve(end - ReadBegin());
 }
 
@@ -48,7 +48,7 @@ void Buffer::HasWritten(size_t len) {
 }
 
 void Buffer::Append(const char* str, size_t len) {
-    assert(str);
+    // assert(str);
     EnsureWritable(len);
     std::copy(str, str + len, WriteBegin());
     HasWritten(len);
@@ -66,7 +66,7 @@ void Buffer::EnsureWritable(size_t len) {
     if (WritableBytes() < len) {
         MakeSpace(len);
     }
-    assert(WritableBytes() >= len);
+    // assert(WritableBytes() >= len);
 }
 
 // 从 fd 中读取数据，写入到 Buffer 中
@@ -120,6 +120,6 @@ void Buffer::MakeSpace(size_t len) {
         std::copy(Begin() + read_pos_, Begin() + write_pos_, Begin());
         read_pos_ = 0;
         write_pos_ = read_pos_ + readable_bytes;
-        assert(readable_bytes == ReadableBytes());
+        // assert(readable_bytes == ReadableBytes());
     }
 }

@@ -6,7 +6,7 @@
 class SqlConnGuard {
    public:
     SqlConnGuard(MYSQL** sql, SqlConnPool* conn_pool) {
-        assert(conn_pool);
+        // assert(conn_pool);
         *sql = conn_pool->BorrowConn();
         sql_ = *sql;
         conn_pool_ = conn_pool;

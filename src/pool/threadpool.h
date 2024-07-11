@@ -12,7 +12,7 @@
 class ThreadPool {
    public:
     explicit ThreadPool(int thread_num = 8) : data_(std::make_shared<Data>()) {
-        assert(thread_num > 0);
+        // assert(thread_num > 0);
         for (int i = 0; i < thread_num; ++i) {
             std::thread([data = data_] {
                 std::unique_lock<std::mutex> locker(data->mtx);

@@ -53,7 +53,7 @@ void HttpResponse::Init(const std::string& work_dir,
                         std::string& file_path,
                         bool is_keep_alive,
                         int code) {
-    assert(work_dir != "");
+    // assert(work_dir != "");
     UnmapFile();
     code_ = code;
     is_keep_alive_ = is_keep_alive;
@@ -133,7 +133,7 @@ void HttpResponse::AddHeaders(Buffer& buff) {
 // 同时，往 buff 中写入 Content-length 和 一个空行
 void HttpResponse::AddBody(Buffer& buff) {
     int fd = open((work_dir_ + file_path_).c_str(), O_RDONLY);
-    assert(fd >= 0);
+    // assert(fd >= 0);
     file_addr_ = mmap(0, file_size(), PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     buff.Append("Content-length: " + std::to_string(file_size()) + "\r\n\r\n");

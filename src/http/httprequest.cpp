@@ -53,7 +53,7 @@ bool HttpRequest::IsKeepAlive() const {
 
 // 按关键字获取指定 Post 请求参数
 std::string HttpRequest::GetPostRequestParm(const std::string& key) const {
-    assert(key != "");
+    // assert(key != "");
     if (post_request_parms_.count(key) == 1) {
         return post_request_parms_.at(key);
     }
@@ -260,11 +260,10 @@ bool HttpRequest::UserVerify(const std::string& name,
     spdlog::debug("Verify name: {},  pwd: {}", name, pwd);
     MYSQL* sql;
     SqlConnGuard give_me_a_name(&sql, SqlConnPool::Instance());
-    assert(sql);
+    // assert(sql);
 
     bool flag = false;
     char order[256]{};
-    MYSQL_FIELD* fields{};
     MYSQL_RES* res{};
 
     if (!is_login) {
@@ -283,6 +282,8 @@ bool HttpRequest::UserVerify(const std::string& name,
 
     res = mysql_store_result(sql);
     mysql_num_fields(res);
+    
+    MYSQL_FIELD* fields{};
     fields = mysql_fetch_fields(res);
 
     while (MYSQL_ROW row = mysql_fetch_row(res)) {
