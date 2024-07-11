@@ -8,7 +8,7 @@ struct Config {
     std::string work_dir = std::filesystem::current_path().string() + "../resources";
     int port = 1027;
     bool enable_linger = true;
-    int timeout = 10000;    // 客户连接超时时间
+    int timeout = 10000;    // 单位：ms
     const char* host = "localhost";
     int sql_port = 3306;
     const char* sql_user = "root";
