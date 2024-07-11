@@ -169,7 +169,7 @@ bool HttpRequest::ParseBody(const std::string& line) {
     body_ = line;
     ParsePost();
     state_ = ParseState::FINISH;
-    spdlog::info("Body:{}, len:{}", line, line.size());
+    spdlog::debug("Body:{}, len:{}", line, line.size());
     return true;
 }
 
@@ -257,7 +257,7 @@ bool HttpRequest::UserVerify(const std::string& name,
     if (name == "" || pwd == "") {
         return false;
     }
-    spdlog::info("Verify name:{} pwd:{}", name, pwd);
+    spdlog::debug("Verify name: {},  pwd: {}", name, pwd);
     MYSQL* sql;
     SqlConnGuard give_me_a_name(&sql, SqlConnPool::Instance());
     assert(sql);
@@ -275,7 +275,7 @@ bool HttpRequest::UserVerify(const std::string& name,
     snprintf(order, 256,
              "SELECT username, password FROM user WHERE username='%s' LIMIT 1",
              name.c_str());
-    spdlog::debug("{}", order);
+    spdlog::debug("sql: {}", order);
 
     if (mysql_query(sql, order) != 0) {
         mysql_free_result(res);
@@ -288,7 +288,7 @@ bool HttpRequest::UserVerify(const std::string& name,
 
     // 为什么要用 while？不就一行记录吗？
     while (MYSQL_ROW row = mysql_fetch_row(res)) {
-        spdlog::debug("MYSQL ROW: {} {}", row[0], row[1]);
+        spdlog::debug("MYSQL ROW: {}, {}", row[0], row[1]);
         std::string password(row[1]);
 
         // 登录 - 验证密码
@@ -310,12 +310,12 @@ bool HttpRequest::UserVerify(const std::string& name,
 
     // 注册行为 且 用户名未被使用
     if (!is_login && flag == true) {
-        spdlog::info("regirster!");
+        spdlog::debug("register!");
         memset(order, 0, sizeof(order));
         snprintf(order, 256,
                  "INSERT INTO user(username, password) VALUES('%s','%s')",
                  name.c_str(), pwd.c_str());
-        spdlog::info("{}", order);
+        spdlog::debug("sql: {}", order);
         if (mysql_query(sql, order) != 0) {
             spdlog::debug("Insert error!");
             flag = false;
