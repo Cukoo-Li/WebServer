@@ -5,9 +5,9 @@ TimerHeap::TimerHeap() {
     heap_.reserve(64);
 }
 
-// 其实没必要显式清空，成员变量自然会被销毁
+// trivial deconstructor
 TimerHeap::~TimerHeap() {
-    Clear();
+
 }
 
 // 向上调整
