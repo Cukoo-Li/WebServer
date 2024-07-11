@@ -87,7 +87,7 @@ void TimerHeap::DoWork(int id) {
 }
 
 // 删除结点
-void TimerHeap::Remove(int idx){
+void TimerHeap::Remove(int idx) {
     assert(!heap_.empty() && idx < heap_.size());
     // 将要删除的结点换到堆尾，然后调整堆
     int i = idx;
@@ -111,16 +111,23 @@ void TimerHeap::Adjust(int id, int timeout) {
     SiftDown(ref_[id], heap_.size());
 }
 
-// 处理当前所有超时的结点
-void TimerHeap::Tick() {
+// 处理当前所有超时的结点，并返回最小结点的超时值
+int TimerHeap::Tick() {
     while (!heap_.empty()) {
         Timer timer = heap_.front();
-        if (std::chrono::duration_cast<MS>(timer.expires - Clock::now()).count() > 0) {
+        if (std::chrono::duration_cast<MS>(timer.expires - Clock::now())
+                .count() > 0) {
             break;
         }
         timer.cb();
         Pop();
     }
+    int res = -1;
+    if (!heap_.empty()) {
+        res = std::chrono::duration_cast<MS>(heap_.front().expires - Clock::now()).count();
+        res = std::max(res, 0);
+    }
+    return res;
 }
 
 // 弹出堆顶结点
@@ -133,15 +140,4 @@ void TimerHeap::Pop() {
 void TimerHeap::Clear() {
     ref_.clear();
     heap_.clear();
-}
-
-// 处理超时结点，并返回新堆顶结点的剩余超时时间（毫秒）
-int TimerHeap::GetNextTick() {
-    Tick();
-    int res = -1;
-    if (!heap_.empty()) {
-        res = std::chrono::duration_cast<MS>(heap_.front().expires - Clock::now()).count();
-        res = std::max(res, 0);
-    }
-    return res;
 }
