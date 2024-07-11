@@ -61,12 +61,12 @@ std::string HttpRequest::GetPostRequestParm(const std::string& key) const {
 }
 
 // 解析请求报文（重点理解）
-HttpRequest::HttpCode HttpRequest::Parse(Buffer& buff) {
+HttpRequest::ParseResult HttpRequest::Parse(Buffer& buff) {
     const char CRLF[] = "\r\n";
-    // 如果读缓冲区中没有内容可以被读取，返回 NO_REQUEST，需要重置 EPOLLIN
+    // 如果读缓冲区中没有内容可以被读取，返回 COMPLETE，需要重置 EPOLLIN
     // 等下次再读
     if (buff.ReadableBytes() == 0) {
-        return HttpCode::NO_REQUEST;
+        return ParseResult::COMPLETE;
     }
 
     // 状态机解析请求报文
@@ -75,9 +75,9 @@ HttpRequest::HttpCode HttpRequest::Parse(Buffer& buff) {
         const char* line_end = std::search(
             buff.ReadBegin(), buff.ConstWriteBegin(), CRLF, CRLF + 2);
         // 如果找不到 CRLF，返回尾后指针，此时 line 并不是一个有效的行，返回
-        // NO_REQUEST，需要重置 EPOLLIN 等下次再读
+        // COMPLETE，需要重置 EPOLLIN 等下次再读
         if (line_end == buff.ConstWriteBegin() && state_ != ParseState::BODY) {
-            return HttpCode::NO_REQUEST;
+            return ParseResult::COMPLETE;
         }
         std::string line(buff.ReadBegin(), line_end);
         // 根据当前状态决定解析方式
@@ -85,38 +85,38 @@ HttpRequest::HttpCode HttpRequest::Parse(Buffer& buff) {
             // 解析请求行
             case ParseState::START_LINE:
                 if (!ParseStartLine(line)) {
-                    return HttpCode::BAD_REQUEST;
+                    return ParseResult::ERROR;
                 }
                 ParseUrl();  // 将默认 url 补充完整
                 break;
             // 解析请求头
             case ParseState::HEADERS:
                 if (!ParseHeaders(line)) {
-                    return HttpCode::BAD_REQUEST;
+                    return ParseResult::ERROR;
                 }
                 // ParseHeaders 在遇到空行时会将 state_ 置为 BODY
                 // 如果是 GET 请求，就解析完毕了
                 if (state_ == ParseState::BODY && method_ == "GET") {
                     state_ = ParseState::FINISH;
                     buff.RetrieveAll();
-                    return HttpCode::GET_REQUEST;
+                    return ParseResult::INCOMPLETE;
                 }
                 break;
             // 解析请求体
             case ParseState::BODY:
                 if (!ParseBody(line)) {
-                    return HttpCode::NO_REQUEST;
+                    return ParseResult::COMPLETE;
                 }
                 buff.RetrieveAll();
-                return HttpCode::GET_REQUEST;
+                return ParseResult::INCOMPLETE;
                 break;
             default:
-                return HttpCode::INTERNAL_ERROR;
+                break;
         }
         buff.RetrieveUntil(line_end + 2);
     }
     spdlog::debug("[{}], [{}], [{}]", method_, url_, version_);
-    return HttpCode::NO_REQUEST;
+    return ParseResult::COMPLETE;
 }
 
 // 将默认 url 补充完整
@@ -263,7 +263,6 @@ bool HttpRequest::UserVerify(const std::string& name,
     assert(sql);
 
     bool flag = false;
-    unsigned int j = 0;
     char order[256]{};
     MYSQL_FIELD* fields{};
     MYSQL_RES* res{};
@@ -283,10 +282,9 @@ bool HttpRequest::UserVerify(const std::string& name,
     }
 
     res = mysql_store_result(sql);
-    j = mysql_num_fields(res);
+    mysql_num_fields(res);
     fields = mysql_fetch_fields(res);
 
-    // 为什么要用 while？不就一行记录吗？
     while (MYSQL_ROW row = mysql_fetch_row(res)) {
         spdlog::debug("MYSQL ROW: {}, {}", row[0], row[1]);
         std::string password(row[1]);

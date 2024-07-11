@@ -65,7 +65,7 @@ void HttpResponse::Init(const std::string& work_dir,
 
 void HttpResponse::MakeResponse(Buffer& buff) {
     // 考察所请求的资源文件的状态
-    if (stat((work_dir_ + file_path_).data(), &file_stat_) < 0 ||
+    if (stat((work_dir_ + file_path_).c_str(),&file_stat_) < 0 ||
         S_ISDIR(file_stat_.st_mode)) {
         code_ = 404;  // 不存在，或者是一个目录
     } else if (!(file_stat_.st_mode & S_IROTH)) {
@@ -102,7 +102,7 @@ std::string HttpResponse::file_type() const {
 void HttpResponse::HandleErrorStatusCode() {
     if (kErrorStatusCodeHtmlPaths_.count(code_)) {
         file_path_ = kErrorStatusCodeHtmlPaths_.at(code_);
-        stat((work_dir_ + file_path_).data(), &file_stat_);
+        stat((work_dir_ + file_path_).c_str(), &file_stat_);
     }
 }
 
@@ -132,7 +132,7 @@ void HttpResponse::AddHeaders(Buffer& buff) {
 // 而是将文件映射到内存中，并将其地址记录到成员变量 file_addr_ 中
 // 同时，往 buff 中写入 Content-length 和 一个空行
 void HttpResponse::AddBody(Buffer& buff) {
-    int fd = open((work_dir_ + file_path_).data(), O_RDONLY);
+    int fd = open((work_dir_ + file_path_).c_str(), O_RDONLY);
     assert(fd >= 0);
     file_addr_ = mmap(0, file_size(), PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);

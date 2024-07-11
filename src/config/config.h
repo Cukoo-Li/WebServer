@@ -3,9 +3,10 @@
 
 #include <string>
 #include <filesystem>
+#include <spdlog/spdlog.h>
 
 struct Config {
-    std::string work_dir = std::filesystem::current_path().string() + "../resources";
+    std::string work_dir = std::filesystem::current_path().string() + "/resources";
     int port = 1027;
     bool enable_linger = true;
     int timeout = 10000;    // 单位：ms
@@ -16,6 +17,7 @@ struct Config {
     const char* db_name = "webserver";
     int sql_conn_pool_size = 8;
     int thread_pool_size = 8;
+    spdlog::level::level_enum log_level = spdlog::level::info;
 };
 
 #endif

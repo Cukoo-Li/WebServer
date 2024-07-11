@@ -13,8 +13,8 @@ class SqlConnPool {
     public:
     static SqlConnPool* Instance();
 
-    void BorrowConn(MYSQL* conn);
-    MYSQL* ReturnConn();
+    MYSQL* BorrowConn();
+    void ReturnConn(MYSQL* sql);
 
     void Init(const char* host, int port, const char* user, const char* pwd, const char* db_name, int conn_num = 8);
 

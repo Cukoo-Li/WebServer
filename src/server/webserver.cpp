@@ -24,16 +24,14 @@ WebServer::WebServer(Config config)
         is_closed_ = true;
     }
 
-    // if (config.enable_log) {
-    //             Log::Instance()->init(config.log_level, "./log", ".log",
-    //             config.log_que_size);
-    //     if(is_closed_) { spdlog::error("========== Server init
-    //     error!=========="); } else {
-    //         spdlog::info("========== Server init ==========");
-    //         spdlog::info("Port:%d, OpenLinger: %s", kPort_, kEnableLinger_?
-    //         "true":"false");
-    //     }
-    // }
+    spdlog::set_level(config.log_level);
+
+    spdlog::info("========== Server init ==========");
+    spdlog::info("Port: {}, Enable Linger: {}", kPort_,
+                 kEnableLinger_ ? "true" : "false");
+    spdlog::info("Work Directory: {}", kWorkDir_);
+    spdlog::info("SQL Connection Pool Size: {}", config.sql_conn_pool_size);
+    spdlog::info("Thread Pool Size: {}", config.thread_pool_size);
 }
 
 WebServer::~WebServer() {
@@ -66,7 +64,6 @@ void WebServer::Startup() {
             else if (events & EPOLLIN) {
                 assert(clients_.count(fd));
                 HandleReadableEvent(&clients_[fd]);
-
             }
             // 处理 connfd 上的可写事件
             else if (events & EPOLLOUT) {
@@ -166,7 +163,9 @@ void WebServer::HandleListenFdEvent() {
         // 注册事件
         epoller_->Add(fd, EPOLLIN | connfd_event_);
         SetFdNonblock(fd);
-        spdlog::info("Client[{}]({}:{}) enter. \t[client count:{}]", clients_[fd].sockfd(), clients_[fd].ip(), clients_[fd].port(), HttpConn::client_count_);
+        spdlog::info("Client[{}]({}:{}) enter. \t[client count:{}]",
+                     clients_[fd].sockfd(), clients_[fd].ip(),
+                     clients_[fd].port(), HttpConn::client_count_);
     }
 }
 

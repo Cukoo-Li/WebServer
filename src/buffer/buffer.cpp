@@ -55,7 +55,7 @@ void Buffer::Append(const char* str, size_t len) {
 }
 
 void Buffer::Append(const std::string& str) {
-    Append(str.data(), str.length());
+    Append(str.c_str(), str.length());
 }
 
 void Buffer::Append(const Buffer& buff) {
@@ -73,7 +73,7 @@ void Buffer::EnsureWritable(size_t len) {
 ssize_t Buffer::ReadFd(int fd, int* save_errno) {
     // 为了保证有足够的空间存储从 fd 中读取到的数据
     // 设置一个辅助数组，分散读，最后再合并起来
-    char buff[1024];  // 辅助数组大小应该根据实际需求调整
+    char buff[2048];  // 辅助数组大小应该根据实际需求调整
     iovec iov[2]{};
     const size_t writable_bytes = WritableBytes();
     iov[0].iov_base = Begin() + write_pos_;

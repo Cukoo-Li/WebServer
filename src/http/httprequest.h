@@ -15,7 +15,7 @@
 
 class HttpRequest {
    public:
-    // 指示解析到请求报文的哪一部分的枚举（主状态机）
+    // 指示解析到请求报文的哪一部分的枚举（状态机）
     enum class ParseState {
         START_LINE,
         HEADERS,
@@ -23,16 +23,11 @@ class HttpRequest {
         FINISH
     };
 
-    // 指示解析结果的枚举（从状态机）
-    enum class HttpCode {
-        NO_REQUEST,
-        GET_REQUEST,
-        BAD_REQUEST,
-        NO_RESOURSE,
-        FORBIDDENT_REQUEST,
-        FILE_REQUEST,
-        INTERNAL_ERROR,
-        CLOSED_CONNECTION
+    // 指示解析结果的枚举
+    enum class ParseResult {
+        COMPLETE,     // 完成（请求报文完整）
+        INCOMPLETE,    // 未完成（请求报文不完整）
+        ERROR     // 出错（请求报文格式有误）
     };
 
     HttpRequest();
@@ -48,7 +43,7 @@ class HttpRequest {
     bool IsKeepAlive() const;
     std::string GetPostRequestParm(const std::string& key) const;
 
-    HttpCode Parse(Buffer& buff);
+    ParseResult Parse(Buffer& buff);
 
    private:
     bool ParseStartLine(const std::string& line);

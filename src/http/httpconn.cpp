@@ -109,14 +109,14 @@ bool HttpConn::Process() {
     if (read_buff_.ReadableBytes() <= 0) {
         return false;
     }
-    HttpRequest::HttpCode http_code = request_.Parse(read_buff_);
+    HttpRequest::ParseResult http_code = request_.Parse(read_buff_);
     // 已接收到完整的请求报文
-    if (http_code == HttpRequest::HttpCode::GET_REQUEST) {
+    if (http_code == HttpRequest::ParseResult::INCOMPLETE) {
         spdlog::debug("Client[{}]({}:{})  request url: {}", sockfd_, ip(), port(), request_.url());
         response_.Init(kWorkDir_, request_.url(), request_.IsKeepAlive(), 200);
     }
     // 请求报文不完整
-    else if (http_code == HttpRequest::HttpCode::NO_REQUEST) {
+    else if (http_code == HttpRequest::ParseResult::COMPLETE) {
         return false;
     }
     // 请求报文解析发生错误
