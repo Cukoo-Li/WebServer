@@ -35,12 +35,6 @@ void Buffer::RetrieveAll() {
     write_pos_ = 0;
 }
 
-std::string Buffer::RetrieveAlltoStr() {
-    std::string res(ReadBegin(), ReadableBytes());
-    RetrieveAll();
-    return res;
-}
-
 const char* Buffer::ConstWriteBegin() const {
     return Begin() + write_pos_;
 }
@@ -77,8 +71,9 @@ void Buffer::EnsureWritable(size_t len) {
 
 // 从 fd 中读取数据，写入到 Buffer 中
 ssize_t Buffer::ReadFd(int fd, int* save_errno) {
-    // 分散读，保证读到不能再读
-    char buff[1024];
+    // 为了保证有足够的空间存储从 fd 中读取到的数据
+    // 设置一个辅助数组，分散读，最后再合并起来
+    char buff[1024];  // 辅助数组大小应该根据实际需求调整
     iovec iov[2]{};
     const size_t writable_bytes = WritableBytes();
     iov[0].iov_base = Begin() + write_pos_;
