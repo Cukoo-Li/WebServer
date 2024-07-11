@@ -31,7 +31,7 @@ void SqlConnPool::Init(const char* host,
     conn_num_ = conn_num;
 }
 
-MYSQL* SqlConnPool::GetConn() {
+MYSQL* SqlConnPool::BorrowConn() {
     MYSQL* sql = nullptr;
     std::unique_lock<std::mutex> locker(mtx_);
     while (conns_que_.empty()) {
@@ -43,7 +43,7 @@ MYSQL* SqlConnPool::GetConn() {
     return sql;
 }
 
-void SqlConnPool::FreeConn(MYSQL* sql) {
+void SqlConnPool::ReturnConn(MYSQL* sql) {
     assert(sql);
     std::unique_lock<std::mutex> locker(mtx_);
     conns_que_.push(sql);
