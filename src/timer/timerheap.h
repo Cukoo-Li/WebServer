@@ -34,9 +34,8 @@ class TimerHeap {
     void Add(int id, int time_out, const TimeoutCallBack& cb);
     void DoWork(int id);
     void Clear();
-    void Tick();
+    int Tick();
     void Pop();
-    int GetNextTick();
 
    private:
     void Remove(int idx);
