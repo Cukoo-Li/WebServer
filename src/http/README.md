@@ -20,5 +20,9 @@ HttpResponse 类封装了响应报文携带的信息（状态码等）以及组�
 
 ## HttpConn
 
+HttpConn 类描述了一条客户与服务器之间连接，主要的成员是 `read_buff_`、`write_buff_`、`Read`、`Write`。
 
-
+- `read_buff_` - 读缓冲区，用于存放请求报文数据（字节流）
+- `write_buff_` - 写缓冲区，用于存放响应报文数据（字节流）
+- `Read` - 从 `sockfd` 中读取请求报文数据，存放到 `read_buff_` 中
+- `Write` - 将 `write_buff_` 中的响应报文数据写入到 `sockfd` 中
