@@ -136,7 +136,6 @@ void WebServer::CloseConn(HttpConn* client) {
     assert(client);
     epoller_->Remove(client->sockfd());
     client->Close();
-    spdlog::info("Client[{}]({}:{}) quit. \t[client count:{}]", clients_[fd].sockfd(), clients_[fd].ip(), clients_[fd].port(), HttpConn::client_count_);
 }
 
 void WebServer::HandleListenFdEvent() {
@@ -144,13 +143,16 @@ void WebServer::HandleListenFdEvent() {
     socklen_t addr_len = sizeof(addr);
     while (true) {
         int fd = accept(listenfd_, (sockaddr*)&addr, &addr_len);
-        if (fd < 0) {
-            // listenfd_ 不可读了，此时 errno == EAGAIN || errno == EWOULDBLOCK
+        // listenfd_ 不可读了，此时 errno == EAGAIN || errno == EWOULDBLOCK
+        if (fd == -1) {
+            if (!(errno == EAGAIN || errno == EWOULDBLOCK)) {
+                spdlog::error("accept occur unknown error.");
+            }
             return;
         }
         if (HttpConn::client_count_ >= kMaxFd_) {
             SendError(fd, "Server is busy!");
-            // LOG_WARN("Clients is full!");
+            spdlog::warn("server is full!");
             return;
         }
         // 创建 HttpConn
