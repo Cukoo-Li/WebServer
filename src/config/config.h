@@ -2,9 +2,10 @@
 #define CONFIG_H
 
 #include <string>
+#include <filesystem>
 
 struct Config {
-    std::string work_dir = "/home/cukoo/文档/GitHub-Repositories/WebServer-Modern-Cpp/resources";
+    std::string work_dir = std::filesystem::current_path().string() + "../resources";
     int port = 1027;
     bool enable_linger = true;
     int timeout = 10000;    // 客户连接超时时间
