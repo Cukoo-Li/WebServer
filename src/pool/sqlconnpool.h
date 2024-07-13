@@ -1,3 +1,6 @@
+// Author: Cukoo
+// Date: 2024-07-03
+
 #ifndef SQL_CONN_POOL_H
 #define SQL_CONN_POOL_H
 
@@ -16,13 +19,11 @@ class SqlConnPool {
     MYSQL* BorrowConn();
     void ReturnConn(MYSQL* sql);
 
-    void Init(const char* host, int port, const char* user, const char* pwd, const char* db_name, int conn_num = 8);
+    void Init(const char* host, int port, const char* user, const char* pwd, const char* db_name, int size = 8);
 
     private:
     SqlConnPool() = default;
     ~SqlConnPool();
-
-    int conn_num_{};
 
     std::queue<MYSQL*> conns_que_;
     std::mutex mtx_;

@@ -1,8 +1,11 @@
+// Author: Cukoo
+// Date: 2024-07-02
+
 #include "epoller.h"
 
 Epoller::Epoller(int max_event_num)
     : epoll_fd_(epoll_create(1)), events_(max_event_num) {
-    // assert(epoll_fd_ >= 0 && events_.size() > 0);
+    assert(epoll_fd_ >= 0 && events_.size() > 0);
 }
 
 Epoller::~Epoller() {
@@ -10,7 +13,7 @@ Epoller::~Epoller() {
 }
 
 bool Epoller::Add(int fd, uint32_t events) {
-    // assert(fd >= 0);
+    assert(fd >= 0);
     epoll_event ev{};
     ev.data.fd = fd;
     ev.events = events;
@@ -18,7 +21,7 @@ bool Epoller::Add(int fd, uint32_t events) {
 }
 
 bool Epoller::Modify(int fd, uint32_t events) {
-    // assert(fd >= 0);
+    assert(fd >= 0);
     epoll_event ev{};
     ev.data.fd = fd;
     ev.events = events;
@@ -26,7 +29,7 @@ bool Epoller::Modify(int fd, uint32_t events) {
 }
 
 bool Epoller::Remove(int fd) {
-    // assert(fd >= 0);
+    assert(fd >= 0);
     return 0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, nullptr);
 }
 
@@ -36,11 +39,11 @@ int Epoller::Wait(int timeout) {
 }
 
 int Epoller::GetEventFd(size_t i) const {
-    // assert(i < events_.size());
+    assert(i < events_.size());
     return events_[i].data.fd;
 }
 
 uint32_t Epoller::GetEvents(size_t i) const {
-    // assert(i < events_.size());
+    assert(i < events_.size());
     return events_[i].events;
 }

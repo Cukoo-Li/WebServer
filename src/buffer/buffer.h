@@ -1,3 +1,6 @@
+// Author: Cukoo
+// Date: 2024-07-01
+
 #ifndef BUFFER_H
 #define BUFFER_H
 

@@ -12,7 +12,7 @@ TimerHeap::~TimerHeap() {
 
 // 向上调整
 void TimerHeap::SiftUp(int idx) {
-    // assert(idx < heap_.size());
+    assert(idx < heap_.size());
     int i = idx;
     int j = (i - 1) / 2;
     while (j >= 0) {
@@ -27,8 +27,8 @@ void TimerHeap::SiftUp(int idx) {
 
 // 向下调整（仅在 i 处不满足堆性质）
 bool TimerHeap::SiftDown(int idx, int last) {
-    // assert(idx < heap_.size());
-    // assert(last <= heap_.size());
+    assert(idx < heap_.size());
+    assert(last <= heap_.size());
     int i = idx;
     int j = i * 2 + 1;
     while (j < last) {
@@ -47,8 +47,8 @@ bool TimerHeap::SiftDown(int idx, int last) {
 
 // 交换两个结点的位置
 void TimerHeap::SwapNode(int i, int j) {
-    // assert(i < heap_.size());
-    // assert(j < heap_.size());
+    assert(i < heap_.size());
+    assert(j < heap_.size());
     std::swap(heap_[i], heap_[j]);
     ref_[heap_[i].id] = i;
     ref_[heap_[j].id] = j;
@@ -56,7 +56,7 @@ void TimerHeap::SwapNode(int i, int j) {
 
 // 添加结点
 void TimerHeap::Add(int id, int timeout, const TimeoutCallBack& cb) {
-    // assert(id >= 0);
+    assert(id >= 0);
     int i;
     if (ref_.count(id) == 0) {
         // 新结点：堆尾插入，调整堆
@@ -88,25 +88,25 @@ void TimerHeap::DoWork(int id) {
 
 // 删除结点
 void TimerHeap::Remove(int idx) {
-    // assert(!heap_.empty() && idx < heap_.size());
+    assert(!heap_.empty() && idx < heap_.size());
     // 将要删除的结点换到堆尾，然后调整堆
     int i = idx;
     int n = heap_.size() - 1;
-    // assert(i <= n);
+    assert(i <= n);
     if (i < n) {
         SwapNode(i, n);
         if (!SiftDown(i, n)) {
             SiftUp(i);
         }
     }
-    // 堆尾元素删除
+    // 删除堆尾元素
     ref_.erase(heap_.back().id);
     heap_.pop_back();
 }
 
-// 更新指定结点的超时时间（只考虑超时时间延长的情形）
+// 更新指定结点的超时时间（这里只考虑超时时间延长的情形）
 void TimerHeap::Adjust(int id, int timeout) {
-    // assert(!heap_.empty() && ref_.count(id) > 0);
+    assert(!heap_.empty() && ref_.count(id) > 0);
     heap_[ref_[id]].expires = Clock::now() + MS(timeout);
     SiftDown(ref_[id], heap_.size());
 }
@@ -132,7 +132,7 @@ int TimerHeap::Tick() {
 
 // 弹出堆顶结点
 void TimerHeap::Pop() {
-    // assert(!heap_.empty());
+    assert(!heap_.empty());
     Remove(0);
 }
 

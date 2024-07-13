@@ -1,3 +1,6 @@
+// Author: Cukoo
+// Date: 2024-07-09
+
 #ifndef CONFIG_H
 #define CONFIG_H
 

@@ -1,3 +1,6 @@
+// Author: Cukoo
+// Date: 2024-07-03
+
 #ifndef HTTP_CONN_H
 #define HTTP_CONN_H
 

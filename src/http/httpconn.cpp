@@ -1,3 +1,6 @@
+// Author: Cukoo
+// Date: 2024-07-04
+
 #include "httpconn.h"
 
 std::string HttpConn::kWorkDir_;
@@ -14,7 +17,7 @@ HttpConn::~HttpConn() {
 }
 
 void HttpConn::Init(int sockfd, const sockaddr_in& addr) {
-    // assert(sockfd > 0);
+    assert(sockfd > 0);
     if (is_closed_) {
         ++client_count_;
     }

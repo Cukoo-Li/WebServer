@@ -16,10 +16,21 @@
 - Linux
 - C++17
 - MySQL
-- spdlog
-- fmt
+- [spdlog](https://github.com/gabime/spdlog)
+- [fmt](https://github.com/fmtlib/fmt)
 
 ## 压力测试
+
+- 测试环境
+  - 操作系统: Arch Linux
+  - CPU: R7-7735H
+  - 内存: 32G
+- 测试结果
+  - 并发连接总数: 12000
+  - 访问服务器时间: 5s
+  - 所有访问均成功
+
+![压测结果](./images/压测结果.png)
 
 ## 致谢
 

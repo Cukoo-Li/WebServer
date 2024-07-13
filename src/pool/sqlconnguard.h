@@ -1,3 +1,7 @@
+// Author: Cukoo
+// Date: 2024-07-03
+
+
 #ifndef SQL_CONN_GUARD_H
 #define SQL_CONN_GUARD_H
 #include "sqlconnpool.h"
@@ -6,7 +10,7 @@
 class SqlConnGuard {
    public:
     SqlConnGuard(MYSQL** sql, SqlConnPool* conn_pool) {
-        // assert(conn_pool);
+        assert(conn_pool);
         *sql = conn_pool->BorrowConn();
         sql_ = *sql;
         conn_pool_ = conn_pool;
