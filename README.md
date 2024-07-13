@@ -1,4 +1,4 @@
-# WebServer-Mordern-Cpp
+# WebServer
 
 本项目为使用现代 C++ 实现的轻量级 Linux 高性能 Web 服务器，经过 WebBench 压力测试，可支持上万的并发连接数据交换。
 
