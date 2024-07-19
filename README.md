@@ -23,6 +23,7 @@
 
 - 安装环境依赖
 - 配置数据库
+  
   ```sql
   // 创建 webserver 数据库
   create database webserver;
@@ -37,8 +38,10 @@
   // 添加用户记录
   INSERT INTO user(username, password) VALUES('username', 'password');
   ```
+  
 - 修改项目配置信息（`src/config/config.h`）
 - 构建与运行
+  
   ```shell
   cd ./src
   cmake . -B ../build
