@@ -19,6 +19,34 @@
 - [spdlog](https://github.com/gabime/spdlog)
 - [fmt](https://github.com/fmtlib/fmt)
 
+## 快速运行
+
+- 安装环境依赖
+- 配置数据库
+  ```sql
+  // 创建 webserver 数据库
+  create database webserver;
+
+  // 创建 user 表
+  USE webserver;
+  CREATE TABLE user(
+    username char(50) NULL,
+    password char(50) NULL
+  )ENGINE=InnoDB;
+  
+  // 添加用户记录
+  INSERT INTO user(username, password) VALUES('username', 'password');
+  ```
+- 修改项目配置信息（`src/config/config.h`）
+- 构建与运行
+  ```shell
+  cd ./src
+  cmake . -B ../build
+  cd ../build
+  make
+  ./webserver
+  ```
+
 ## 压力测试
 
 - 测试环境
