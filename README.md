@@ -43,9 +43,8 @@
 - 构建与运行
   
   ```shell
-  cd ./src
-  cmake . -B ../build
-  cd ../build
+  cmake . -B ./build
+  cd ./build
   make
   ./webserver
   ```

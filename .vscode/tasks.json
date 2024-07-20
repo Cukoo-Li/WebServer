@@ -9,10 +9,10 @@
             "args": [
                 ".",
                 "-B",
-                "../build",
+                "./build",
             ],
             "options": {
-                "cwd": "${workspaceFolder}/src"
+                "cwd": "${workspaceFolder}"
             }
         },
         {

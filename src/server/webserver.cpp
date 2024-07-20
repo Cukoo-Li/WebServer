@@ -1,7 +1,7 @@
 // Author: Cukoo
 // Date: 2024-07-02
 
-#include "webserver.h"
+#include "server/webserver.h"
 
 int WebServer::SetFdNonblock(int fd) {
     assert(fd > 0);
@@ -30,8 +30,7 @@ WebServer::WebServer(Config config)
     }
 
     spdlog::info("========== Server init ==========");
-    spdlog::info("Port: {}, Enable Linger: {}", kPort_,
-                 kEnableLinger_ ? "true" : "false");
+    spdlog::info("Port: {}, Enable Linger: {}", kPort_, kEnableLinger_ ? "true" : "false");
     spdlog::info("Work Directory: {}", kWorkDir_);
     spdlog::info("SQL Connection Pool Size: {}", config.sql_conn_pool_size);
     spdlog::info("Thread Pool Size: {}", config.thread_pool_size);
@@ -166,9 +165,7 @@ void WebServer::HandleListenFdEvent() {
         // 注册事件
         epoller_->Add(fd, EPOLLIN | connfd_event_);
         SetFdNonblock(fd);
-        spdlog::info("Client[{}]({}:{}) enter. \t[client count:{}]",
-                     clients_[fd].sockfd(), clients_[fd].ip(),
-                     clients_[fd].port(), HttpConn::client_count_);
+        spdlog::info("Client[{}]({}:{}) enter. \t[client count:{}]", clients_[fd].sockfd(), clients_[fd].ip(), clients_[fd].port(), HttpConn::client_count_);
     }
 }
 

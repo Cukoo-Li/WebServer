@@ -12,10 +12,10 @@
 #include <atomic>
 #include <spdlog/spdlog.h>
 
-#include "httprequest.h"
-#include "httpresponse.h"
-#include "../pool/sqlconnguard.h"
-#include "../buffer/buffer.h"
+#include "http/httprequest.h"
+#include "http/httpresponse.h"
+#include "pool/sqlconnguard.h"
+#include "buffer/buffer.h"
 
 class HttpConn {
    public:

@@ -12,9 +12,9 @@
 #include <unordered_set>
 #include <spdlog/spdlog.h>
 
-#include "../buffer/buffer.h"
-#include "../pool/sqlconnguard.h"
-#include "../pool/sqlconnpool.h"
+#include "buffer/buffer.h"
+#include "pool/sqlconnguard.h"
+#include "pool/sqlconnpool.h"
 
 class HttpRequest {
    public:

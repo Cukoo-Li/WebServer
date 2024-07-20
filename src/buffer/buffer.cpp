@@ -1,7 +1,7 @@
 // Author: Cukoo
 // Date: 2024-07-01
 
-#include "buffer.h"
+#include "buffer/buffer.h"
 
 Buffer::Buffer(int init_buff_size)
     : buffer_(init_buff_size), read_pos_(0), write_pos_(0) {}

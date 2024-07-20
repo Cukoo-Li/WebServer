@@ -1,7 +1,7 @@
 // Author: Cukoo
 // Date: 2024-07-04
 
-#include "httpresponse.h"
+#include "http/httpresponse.h"
 
 const std::unordered_map<std::string, std::string> HttpResponse::kSuffixTypes_ =
     {

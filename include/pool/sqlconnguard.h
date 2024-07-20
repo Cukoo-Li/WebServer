@@ -4,7 +4,7 @@
 
 #ifndef SQL_CONN_GUARD_H
 #define SQL_CONN_GUARD_H
-#include "sqlconnpool.h"
+#include "pool/sqlconnpool.h"
 #include <assert.h>
 
 class SqlConnGuard {

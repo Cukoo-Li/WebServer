@@ -16,12 +16,12 @@
 #include <spdlog/spdlog.h>
 
 #include "epoller.h"
-#include "../timer/timerheap.h"
-#include "../pool/sqlconnpool.h"
-#include "../pool/threadpool.h"
-#include "../pool/sqlconnguard.h"
-#include "../http/httpconn.h"
-#include "../config/config.h"
+#include "timer/timerheap.h"
+#include "pool/sqlconnpool.h"
+#include "pool/threadpool.h"
+#include "pool/sqlconnguard.h"
+#include "http/httpconn.h"
+#include "config/config.h"
 
 class WebServer {
     public:
