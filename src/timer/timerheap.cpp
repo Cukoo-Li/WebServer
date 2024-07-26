@@ -42,7 +42,7 @@ bool TimerHeap::SiftDown(int idx, int last) {
         i = j;
         j = i * 2 + 1;
     }
-    return j > idx;
+    return i > idx;
 }
 
 // 交换两个结点的位置
