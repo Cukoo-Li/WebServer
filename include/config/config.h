@@ -16,7 +16,7 @@ struct Config {
     const char* host = "localhost";
     int sql_port = 3306;
     const char* sql_user = "root";
-    const char* sql_pwd = "768787";
+    const char* sql_pwd = "123456";
     const char* db_name = "webserver";
     int sql_conn_pool_size = 8;
     int thread_pool_size = 8;
