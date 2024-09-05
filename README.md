@@ -64,6 +64,6 @@
 
 ## 致谢
 
-Linux高性能服务器编程，游双著.
+Linux 高性能服务器编程，游双著.
 
 [@markparticle](https://github.com/markparticle/WebServer)
