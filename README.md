@@ -39,7 +39,7 @@
   INSERT INTO user(username, password) VALUES('username', 'password');
   ```
   
-- 修改项目配置信息（`src/config/config.h`）
+- 修改项目配置（`src/config/config.h`）
 - 构建与运行
   
   ```shell
@@ -68,11 +68,11 @@ Linux 高性能服务器编程，游双著.
 
 [@markparticle](https://github.com/markparticle/WebServer)
 
-相较于原版项目：
+对原版项目的改进：
 
-- 代码风格和项目目录结构更加规范
+- 使用更加规范的代码风格和项目目录结构
 - 使用 CMake 作为项目构建工具
 - 添加全局配置类
 - 修复了一些明显的 Bug
   
-  > 原版不支持处理分多次到达的请求报文数据，小根堆的实现也存在问题
+  > 原版不支持处理分多次到达的请求报文数据，小根堆的实现也存在问题。
