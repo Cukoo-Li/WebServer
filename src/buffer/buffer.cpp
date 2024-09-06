@@ -115,14 +115,16 @@ const char* Buffer::Begin() const {
     return &buffer_[0];
 }
 
+// 确保待写入区间长度不小于 len 个字节
 void Buffer::MakeSpace(size_t len) {
-    if (WritableBytes() + PrependableBytes() < len) {
-        buffer_.resize(write_pos_ + len + 1);
-    } else {
+    // 如果可以复用 [0, read_pos_)，就紧凑一下，否则进行扩容。
+    if (WritableBytes() + PrependableBytes() >= len) {
         size_t readable_bytes = ReadableBytes();
         std::copy(Begin() + read_pos_, Begin() + write_pos_, Begin());
         read_pos_ = 0;
         write_pos_ = read_pos_ + readable_bytes;
         assert(readable_bytes == ReadableBytes());
+    } else {
+        buffer_.resize(write_pos_ + len + 1);
     }
 }

@@ -13,56 +13,55 @@
 
 class ThreadPool {
    public:
-    explicit ThreadPool(int size = 8) : data_(std::make_shared<Data>()) {
+    explicit ThreadPool(int size = 8) {
         for (int i = 0; i < size; ++i) {
-            data_->threads.emplace_back([data = data_]() {
-                std::unique_lock<std::mutex> locker(data->mtx);
+            threads_.emplace_back([&]() -> void {
+                std::unique_lock<std::mutex> lck(mtx_);
                 while (true) {
-                    if (!data->tasks.empty()) {
-                        auto task = data->tasks.front();
-                        data->tasks.pop();
-                        locker.unlock();
+                    // 检查 tasks_ 和 is_shutdown_ 时必须加锁
+                    if (!tasks_.empty()) {
+                        auto task = tasks_.front();
+                        tasks_.pop();
+                        lck.unlock();
                         task();
-                        locker.lock();
-                        continue;
+                        lck.lock();
+                        continue;       // 优雅关闭的关键
                     }
-                    if (data->is_stopped) {
+                    if (is_shutdown_) {
                         break;
                     }
-                    data->cv.wait(locker);
+                    // 如果两个条件都不满足，就在条件变量上等待
+                    cv_.wait(lck);
                 }
             });
         }
     }
 
     ~ThreadPool() {
-        std::unique_lock<std::mutex> locker(data_->mtx);
-        data_->is_stopped = true;
-        locker.unlock();
-        data_->cv.notify_all();
-        for (auto& t : data_->threads) {
+        // 修改 is_shutdown_，然后通知所有线程，并逐个 join
+        std::unique_lock<std::mutex> lck(mtx_);
+        is_shutdown_ = true;
+        lck.unlock();
+        cv_.notify_all();
+        for (auto& t : threads_) {
             t.join();
         }
     }
 
     void AddTask(std::function<void()> task) {
-        std::unique_lock<std::mutex> locker(data_->mtx);
-        data_->tasks.emplace(task);
-        locker.unlock();
-        data_->cv.notify_one();
+        // 修改 tasks_，然后通知一个线程
+        std::unique_lock<std::mutex> lck(mtx_);
+        tasks_.push(task);
+        lck.unlock();
+        cv_.notify_one();
     }
 
    private:
-    // 如果不 detach，最后要 join
-    // 的话，就没必要封装一个结构体，再设置一个共享指针
-    struct Data {
-        std::vector<std::thread> threads;
-        std::queue<std::function<void()>> tasks;
-        std::mutex mtx;
-        std::condition_variable cv;
-        bool is_stopped;
-    };
-    std::shared_ptr<Data> data_;
+    std::vector<std::thread> threads_;
+    std::queue<std::function<void()>> tasks_;
+    std::mutex mtx_;
+    std::condition_variable cv_;
+    bool is_shutdown_;
 };
 
 #endif

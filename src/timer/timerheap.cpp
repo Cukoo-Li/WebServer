@@ -6,9 +6,7 @@ TimerHeap::TimerHeap() {
 }
 
 // trivial deconstructor
-TimerHeap::~TimerHeap() {
-
-}
+TimerHeap::~TimerHeap() {}
 
 // 向上调整
 void TimerHeap::SiftUp(int idx) {
@@ -124,7 +122,9 @@ int TimerHeap::Tick() {
     }
     int res = -1;
     if (!heap_.empty()) {
-        res = std::chrono::duration_cast<MS>(heap_.front().expires - Clock::now()).count();
+        res =
+            std::chrono::duration_cast<MS>(heap_.front().expires - Clock::now())
+                .count();
         res = std::max(res, 0);
     }
     return res;

@@ -21,7 +21,7 @@ WebServer::WebServer(Config config)
     // 定时器容器、线程池、epoll 内核事件表、数据库连接池、监听 socket
     timer_heap_.reset(new TimerHeap());
     thread_pool_.reset(new ThreadPool(config.thread_pool_size));
-    epoller_.reset(new Epoller(65535));
+    epoller_.reset(new Epoller(20000));
     SqlConnPool::Instance()->Init(config.host, config.sql_port, config.sql_user,
                                   config.sql_pwd, config.db_name,
                                   config.sql_conn_pool_size);
