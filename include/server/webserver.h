@@ -62,7 +62,6 @@ class WebServer {
     std::unique_ptr<ThreadPool> thread_pool_;
     std::unique_ptr<Epoller> epoller_;
     std::unordered_map<int, HttpConn> clients_;
-
 };
 
 #endif

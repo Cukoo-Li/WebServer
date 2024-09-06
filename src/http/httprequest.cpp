@@ -66,21 +66,21 @@ std::string HttpRequest::GetPostRequestParm(const std::string& key) const {
 // 解析请求报文（重点理解）
 HttpRequest::ParseResult HttpRequest::Parse(Buffer& buff) {
     const char CRLF[] = "\r\n";
-    // 如果读缓冲区中没有内容可以被读取，返回 COMPLETE，需要重置 EPOLLIN
+    // 如果读缓冲区中没有内容可以被读取，返回 INCOMPLETE，需要重置 EPOLLIN
     // 等下次再读
     if (buff.ReadableBytes() == 0) {
-        return ParseResult::COMPLETE;
+        return ParseResult::INCOMPLETE;
     }
 
     // 状态机解析请求报文
     while (buff.ReadableBytes() && state_ != ParseState::FINISH) {
-        // 先尝试从读缓冲区中提取出一行
+        // 尝试从读缓冲区中提取出一行
         const char* line_end = std::search(
             buff.ReadBegin(), buff.ConstWriteBegin(), CRLF, CRLF + 2);
-        // 如果找不到 CRLF，返回尾后指针，此时 line 并不是一个有效的行，返回
-        // COMPLETE，需要重置 EPOLLIN 等下次再读
+        // 如果找不到 CRLF，并且当前状态不是解析请求体，说明 line
+        // 并不是一个有效的行，返回 INCOMPLETE，需要重置 EPOLLIN 等下次再读
         if (line_end == buff.ConstWriteBegin() && state_ != ParseState::BODY) {
-            return ParseResult::COMPLETE;
+            return ParseResult::INCOMPLETE;
         }
         std::string line(buff.ReadBegin(), line_end);
         // 根据当前状态决定解析方式
@@ -102,16 +102,16 @@ HttpRequest::ParseResult HttpRequest::Parse(Buffer& buff) {
                 if (state_ == ParseState::BODY && method_ == "GET") {
                     state_ = ParseState::FINISH;
                     buff.RetrieveAll();
-                    return ParseResult::INCOMPLETE;
+                    return ParseResult::COMPLETE;
                 }
                 break;
             // 解析请求体
             case ParseState::BODY:
                 if (!ParseBody(line)) {
-                    return ParseResult::COMPLETE;
+                    return ParseResult::INCOMPLETE;
                 }
                 buff.RetrieveAll();
-                return ParseResult::INCOMPLETE;
+                return ParseResult::COMPLETE;
                 break;
             default:
                 break;
@@ -119,7 +119,7 @@ HttpRequest::ParseResult HttpRequest::Parse(Buffer& buff) {
         buff.RetrieveUntil(line_end + 2);
     }
     spdlog::debug("[{}], [{}], [{}]", method_, url_, version_);
-    return ParseResult::COMPLETE;
+    return ParseResult::INCOMPLETE;
 }
 
 // 将默认 url 补充完整
@@ -253,7 +253,7 @@ void HttpRequest::ParseFromUrlencoded() {
     }
 }
 
-// 用户注册登录验证*****
+// 用户注册、登录校验
 bool HttpRequest::UserVerify(const std::string& name,
                              const std::string& pwd,
                              bool is_login) {
@@ -262,11 +262,11 @@ bool HttpRequest::UserVerify(const std::string& name,
     }
     spdlog::debug("Verify name: {},  pwd: {}", name, pwd);
     MYSQL* sql;
-    SqlConnGuard give_me_a_name(&sql, SqlConnPool::Instance());
+    SqlConnGuard sql_conn_guard(&sql, SqlConnPool::Instance());
     assert(sql);
 
     bool flag = false;
-    char order[256]{};
+    char order[256]{};  // 存放 SQL 语句
     MYSQL_RES* res{};
 
     if (!is_login) {
@@ -285,7 +285,7 @@ bool HttpRequest::UserVerify(const std::string& name,
 
     res = mysql_store_result(sql);
     mysql_num_fields(res);
-    
+
     MYSQL_FIELD* fields{};
     fields = mysql_fetch_fields(res);
 
