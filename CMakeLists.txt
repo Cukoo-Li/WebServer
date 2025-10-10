@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.0)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(webserver)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLGS} -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
 set(CMAKE_BUILD_TYPE Release)
 
